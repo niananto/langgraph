@@ -23,14 +23,14 @@ each step so you can SEE:
 Run (no API key needed — uses local Ollama):
     ollama pull llama3.1:8b
     ollama serve
-    uv pip install langchain langchain-openai langchain-anthropic langchain-ollama tiktoken transformers requests
+    uv pip install langchain langchain-openai langchain-anthropic langchain-ollama tiktoken transformers requests python-dotenv
     # For real tokenization (optional):
     #   accept Meta license at huggingface.co/meta-llama/Meta-Llama-3.1-8B
-    #   huggingface-cli login   # or: export HF_TOKEN=hf_...
+    #   add HF_TOKEN=hf_... to your .env file
     python middleware_deep_dive.py
 
 With an API key (OpenAI or Anthropic takes priority):
-    export OPENAI_API_KEY=sk-...
+    # add OPENAI_API_KEY=sk-... to your .env file
     python middleware_deep_dive.py
 """
 
@@ -42,6 +42,9 @@ import textwrap
 from typing import Any, Callable
 
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Model selection. OpenAI → Anthropic → LLaMA 3.1 via Ollama (no key needed).
@@ -146,8 +149,8 @@ TOOLS = [search_flights, book_flight]
 #
 # One-time setup:
 #   pip install transformers
-#   # Accept Meta's license at huggingface.co/meta-llama/Meta-Llama-3.1-8B
-#   huggingface-cli login          # paste your HF token
+#   Accept Meta's license at huggingface.co/meta-llama/Meta-Llama-3.1-8B
+#   Add HF_TOKEN=hf_... to your .env file
 # ---------------------------------------------------------------------------
 def _load_llama_tokenizer():
     """Load LLaMA 3.1 tokenizer from HuggingFace (tokenizer files only, ~few MB)."""
@@ -345,7 +348,7 @@ def _show_real_tokens(rendered: str) -> None:
             f"\n(Could not load LLaMA tokenizer: {e})"
             "\nSetup: pip install transformers"
             "\n       accept Meta license at huggingface.co/meta-llama/Meta-Llama-3.1-8B"
-            "\n       huggingface-cli login   # or set HF_TOKEN env var"
+            "\n       add HF_TOKEN=hf_... to your .env file"
         )
         return
 

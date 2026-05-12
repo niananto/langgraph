@@ -1,4 +1,5 @@
 langchain
+python-dotenv
 langchain-openai
 langchain-anthropic
 langchain-ollama
