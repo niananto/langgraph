@@ -31,7 +31,7 @@ uv venv && source .venv/bin/activate          # or: python -m venv .venv
 uv pip install -e libs/checkpoint -e libs/prebuilt -e libs/langgraph
 
 # extras for the middleware deep-dive script
-uv pip install langchain langchain-openai langchain-anthropic tiktoken
+uv pip install langchain langchain-openai langchain-anthropic langchain-ollama tiktoken requests
 
 # sanity check — should print a path under libs/langgraph/langgraph/__init__.py
 python -c "import langgraph; print(langgraph.__file__)"
@@ -40,8 +40,9 @@ python -c "import langgraph; print(langgraph.__file__)"
 python debug_tick.py
 # expected: {'n': 20}
 
-# run the wiretap agent (need API key)
-export OPENAI_API_KEY=sk-...                  # or ANTHROPIC_API_KEY=...
+# run the wiretap agent (needs Ollama running, or set OPENAI/ANTHROPIC key)
+ollama pull llama3.1:8b
+ollama serve
 python middleware_deep_dive.py
 ```
 
@@ -71,11 +72,9 @@ Agent with two tools:
   - `ModelRequest` fields (system_prompt, tools, messages)
   - Tool **JSON-Schemas** via `convert_to_openai_tool`
   - **Provider HTTP payload** (post-langchain conversion, pre-tokenization)
-  - **Tokenizer view** via `tiktoken` — token IDs + per-token decoded
-    strings — shows that the LLM consumes one token stream, not a list
-    of messages; message boundaries are special tokens
-    (`<|im_start|>user`, `<|im_end|>`); tool schemas are inlined JSON
-    text inside the prompt
+  - **Real LLaMA 3.1 token IDs** via Ollama `/api/tokenize` (requires
+    Ollama ≥ 0.3.0 — see section below if you get a 404)
+  - **Token → embedding vector** via Ollama `/api/embed`
 - `wrap_model_call` (response side) — raw `AIMessage`, `.tool_calls`,
   `.response_metadata`, `.usage_metadata`
 - `after_model` — newest message orchestrator appended
@@ -171,13 +170,67 @@ Pair with breakpoint to map debug events ↔ `tick()` internals.
      provider-specific chat template, then tokenizes into a single
      sequence of integer IDs.
    - Message boundaries are *special tokens* inside that sequence
-     (`<|im_start|>user`, `<|im_end|>` for OpenAI Harmony/ChatML;
-     `<|start_header_id|>` for Llama; etc.). Model learned the pattern
-     during training — that's how it knows whose turn it is.
+     (`<|start_header_id|>user<|end_header_id|>` for LLaMA 3.1;
+     `<|im_start|>user` / `<|im_end|>` for OpenAI ChatML).
    - Tool definitions are inlined as JSON text in the prompt. The model
      generates a tool call by emitting tokens that match a learned
      tool-call format. The SDK parses those tokens back into the
      structured `tool_calls` field on `AIMessage`.
+
+---
+
+## Token → embedding deep-dive (parked, resume here)
+
+`middleware_deep_dive.py` already has `_show_token_embeddings()` wired up,
+but the Ollama `/api/tokenize` endpoint returns 404 on older installs.
+
+**Root cause:** `/api/tokenize`, `/api/detokenize`, and `/api/embed` were
+added in **Ollama 0.3.0** (July 2024). The core `/api/chat` route that
+`ChatOllama` uses is older, so the model works fine but tokenize/embed 404s.
+
+**Fix:** `ollama --version` → if below 0.3.0, update from ollama.com/download.
+
+Once Ollama ≥ 0.3.0 the script will automatically:
+1. Call `/api/tokenize` → real LLaMA 3.1 BPE token IDs (128 256-token vocab).
+2. Call `/api/detokenize` per ID → decoded subword string.
+3. Call `/api/embed` per token → 4096-dim contextualised vector.
+
+**Going further — raw embedding matrix lookup (no Ollama needed):**
+
+The contextualised `/api/embed` vectors pass through the full model.
+To get the *raw* embedding-matrix row `E[token_id]` (just the lookup table,
+no transformer layers applied):
+
+```python
+from transformers import AutoModel
+import torch
+
+# Requires: pip install transformers torch
+# Requires HF account + accepted Meta license at
+#   https://huggingface.co/meta-llama/Meta-Llama-3.1-8B
+# Downloads ~16 GB of weights on first run.
+m = AutoModel.from_pretrained(
+    "meta-llama/Meta-Llama-3.1-8B",
+    torch_dtype=torch.float16,   # halves RAM to ~8 GB
+    device_map="cpu",
+)
+E = m.model.embed_tokens.weight   # shape [128256, 4096]
+
+# Example: look up token 128000 (<|begin_of_text|>)
+vec = E[128000].detach().float().numpy()
+print(vec.shape)   # (4096,)
+print(vec[:8])     # first 8 dims
+```
+
+Key facts about LLaMA 3.1 8B embeddings:
+- Vocab size: 128 256 tokens (tiktoken BPE with Meta's custom merges).
+- Hidden dim: 4096 (that's the length of every token vector).
+- Special tokens start at ID 128 000: `<|begin_of_text|>` = 128000,
+  `<|start_header_id|>` = 128006, `<|eot_id|>` = 128009.
+- The embedding matrix is tied with the LM head (output projection) —
+  the same 128 256 × 4096 matrix is used both to look up input vectors
+  and to score output logits. This is why the model can predict tokens
+  in the same space it reads them.
 
 ---
 
@@ -187,6 +240,8 @@ Pair with breakpoint to map debug events ↔ `tick()` internals.
   `middleware_deep_dive.py` under debugger) — see the same loop with
   real tool execution, multiple super-steps, and `ToolNode` channel
   writes.
+- Update Ollama to ≥ 0.3.0 and re-run to get the real token ID + embedding
+  output from `_show_real_tokens()` / `_show_token_embeddings()`.
 - Add a `wrap_tool_call` hook to `WireTapMiddleware` so tool inputs /
   outputs also get dumped per call (currently only model edges are
   tapped).
