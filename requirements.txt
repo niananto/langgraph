@@ -4,4 +4,6 @@ langchain-anthropic
 langchain-ollama
 langchain-core
 tiktoken
+transformers
+requests
 debugpy

@@ -9,13 +9,13 @@ each step so you can SEE:
      (messages + tool JSON-Schemas + system prompt).
   3. The provider HTTP payload (what really goes on the wire) — JSON dicts
      after langchain's message-to-provider conversion.
-  4. The REAL tokenizer view via Ollama's /api/tokenize — actual LLaMA 3.1
-     token IDs, not tiktoken approximations.
+  4. The REAL tokenizer view via transformers AutoTokenizer — actual LLaMA 3.1
+     token IDs. Requires HF token + Meta license acceptance.
   5. Token → embedding vector lookup: each token ID maps to a row in the
      model's embedding matrix (shape: [vocab_size=128256, hidden_dim=4096]).
      LLaMA 3's weights are public (Meta license), so you can inspect any
      token's vector. We query Ollama's /api/embed as a proxy; for raw matrix
-     access see the "Raw embedding lookup" note at the bottom.
+     access see the "Raw embedding lookup" note in _show_token_embeddings.
   6. The raw `ModelResponse` (AIMessage) — tool_calls, response_metadata,
      usage_metadata.
   7. The ToolMessage round-trip.
@@ -23,7 +23,10 @@ each step so you can SEE:
 Run (no API key needed — uses local Ollama):
     ollama pull llama3.1:8b
     ollama serve
-    uv pip install langchain langchain-openai langchain-anthropic langchain-ollama tiktoken requests
+    uv pip install langchain langchain-openai langchain-anthropic langchain-ollama tiktoken transformers requests
+    # For real tokenization (optional):
+    #   accept Meta license at huggingface.co/meta-llama/Meta-Llama-3.1-8B
+    #   huggingface-cli login   # or: export HF_TOKEN=hf_...
     python middleware_deep_dive.py
 
 With an API key (OpenAI or Anthropic takes priority):
@@ -135,28 +138,24 @@ TOOLS = [search_flights, book_flight]
 
 
 # ---------------------------------------------------------------------------
-# Ollama tokenizer helpers — real LLaMA 3.1 token IDs, not approximations.
+# Tokenizer helpers — real LLaMA 3.1 token IDs via transformers.
+#
+# Note: Ollama does NOT expose a /api/tokenize endpoint. Real tokenization
+# requires AutoTokenizer from transformers, which downloads just the
+# tokenizer files (~a few MB) from HuggingFace.
+#
+# One-time setup:
+#   pip install transformers
+#   # Accept Meta's license at huggingface.co/meta-llama/Meta-Llama-3.1-8B
+#   huggingface-cli login          # paste your HF token
 # ---------------------------------------------------------------------------
-def _ollama_tokenize(text: str) -> list[int]:
-    """Return real LLaMA 3.1 token IDs for `text` via Ollama's tokenize API."""
-    resp = requests.post(
-        f"{OLLAMA_BASE}/api/tokenize",
-        json={"model": MODEL_NAME, "prompt": text},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return resp.json()["tokens"]
+def _load_llama_tokenizer():
+    """Load LLaMA 3.1 tokenizer from HuggingFace (tokenizer files only, ~few MB)."""
+    from transformers import AutoTokenizer
 
-
-def _ollama_detokenize(token_ids: list[int]) -> str:
-    """Convert a list of token IDs back to a string via Ollama's detokenize API."""
-    resp = requests.post(
-        f"{OLLAMA_BASE}/api/detokenize",
-        json={"model": MODEL_NAME, "tokens": token_ids},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return resp.json()["content"]
+    hf_model = "meta-llama/Meta-Llama-3.1-8B"
+    hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN")
+    return AutoTokenizer.from_pretrained(hf_model, token=hf_token)
 
 
 def _ollama_embed(text: str) -> list[float]:
@@ -209,7 +208,7 @@ class WireTapMiddleware(AgentMiddleware):
         wire_payload = _to_wire_payload(request)
         print(json.dumps(wire_payload, indent=2, default=str))
 
-        banner("Tokenizer view — real LLaMA 3.1 token IDs via Ollama", ch="-")
+        banner("Tokenizer view — real LLaMA 3.1 token IDs via transformers", ch="-")
         _tokenize_payload(wire_payload)
 
         response = handler(request)
@@ -307,7 +306,6 @@ def _tokenize_payload(payload: dict[str, Any]) -> None:
                    E = m.model.embed_tokens.weight          # [128256, 4096]
                    vec = E[token_id].detach().numpy()       # [4096]
     """
-    # --- render the chat template the way LLaMA 3.1 expects it -------------
     rendered_parts: list[str] = ["<|begin_of_text|>"]
     for m in payload["messages"]:
         role = m["role"]
@@ -321,7 +319,6 @@ def _tokenize_payload(payload: dict[str, Any]) -> None:
                     f"<|start_header_id|>tool_call<|end_header_id|>\n\n"
                     f"{tc['function']['name']}({tc['function']['arguments']})<|eot_id|>"
                 )
-    # Tool schemas go into a special block before the assistant turn
     tool_block = json.dumps(payload.get("tools", []))
     rendered_parts.insert(
         1,
@@ -333,31 +330,33 @@ def _tokenize_payload(payload: dict[str, Any]) -> None:
     print("Rendered chat-template string (LLaMA 3.1 format, first 1200 chars):")
     print(textwrap.indent(rendered[:1200] + ("..." if len(rendered) > 1200 else ""), "    "))
 
-    # --- real tokenization via Ollama ---------------------------------------
     if not USE_OPENAI and not USE_ANTHROPIC:
         _show_real_tokens(rendered)
     else:
-        # For OpenAI/Anthropic we fall back to tiktoken as an approximation
         _show_tiktoken_approx(rendered)
 
 
 def _show_real_tokens(rendered: str) -> None:
-    """Use Ollama's /api/tokenize + /api/detokenize for exact LLaMA 3.1 IDs."""
+    """Tokenize with the real LLaMA 3.1 BPE tokenizer via transformers."""
     try:
-        ids = _ollama_tokenize(rendered)
+        tokenizer = _load_llama_tokenizer()
     except Exception as e:
-        print(f"\n(Ollama tokenize failed: {e} — is Ollama running?)")
+        print(
+            f"\n(Could not load LLaMA tokenizer: {e})"
+            "\nSetup: pip install transformers"
+            "\n       accept Meta license at huggingface.co/meta-llama/Meta-Llama-3.1-8B"
+            "\n       huggingface-cli login   # or set HF_TOKEN env var"
+        )
         return
 
-    print(f"\nTotal tokens (exact, from Ollama): {len(ids)}")
+    ids = tokenizer.encode(rendered, add_special_tokens=False)
+
+    print(f"\nTotal tokens (exact, LLaMA 3.1 BPE): {len(ids)}")
     print("First 40 token IDs:", ids[:40])
 
-    print("\nFirst 40 tokens decoded individually (Ollama detokenize):")
+    print("\nFirst 40 tokens decoded individually:")
     for i, tid in enumerate(ids[:40]):
-        try:
-            piece = _ollama_detokenize([tid])
-        except Exception:
-            piece = "?"
+        piece = tokenizer.decode([tid])
         print(f"  [{i:>2}]  id={tid:>7}  decoded={piece!r}")
 
     print(
@@ -370,18 +369,19 @@ def _show_real_tokens(rendered: str) -> None:
     )
 
     banner("Token → embedding vector (first 5 tokens via Ollama /api/embed)", ch="-")
-    _show_token_embeddings(ids[:5])
+    _show_token_embeddings(ids[:5], tokenizer)
 
 
-def _show_token_embeddings(token_ids: list[int]) -> None:
-    """Show the embedding vector for each token.
+def _show_token_embeddings(token_ids: list[int], tokenizer: Any) -> None:
+    """Show the embedding vector for each token via Ollama /api/embed.
 
-    Ollama's /api/embed runs the full model encoder, so the vectors are
-    contextualised. For the raw embedding-matrix row (E[token_id] with no
-    context), load the weights directly:
+    Ollama's /api/embed runs the full model, so vectors are contextualised
+    (not the raw embedding-matrix row). For the raw lookup:
 
         from transformers import AutoModel
-        m = AutoModel.from_pretrained("meta-llama/Meta-Llama-3.1-8B")
+        import torch
+        m = AutoModel.from_pretrained("meta-llama/Meta-Llama-3.1-8B",
+                                      torch_dtype=torch.float16, device_map="cpu")
         E = m.model.embed_tokens.weight          # shape [128256, 4096]
         vec = E[token_id].detach().float().numpy()
     """
@@ -390,10 +390,7 @@ def _show_token_embeddings(token_ids: list[int]) -> None:
         "For the raw embedding-matrix row, see the docstring above.\n"
     )
     for tid in token_ids:
-        try:
-            decoded = _ollama_detokenize([tid])
-        except Exception:
-            decoded = "?"
+        decoded = tokenizer.decode([tid])
         try:
             vec = _ollama_embed(decoded if decoded.strip() else " ")
             dim = len(vec)
