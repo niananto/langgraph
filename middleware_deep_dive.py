@@ -22,7 +22,12 @@ Run:
     # inside your langgraph venv (uv-managed earlier in this session)
     export OPENAI_API_KEY=sk-...        # or ANTHROPIC_API_KEY=...
     # extras you may need:
-    uv pip install langchain langchain-openai langchain-anthropic tiktoken
+    uv pip install langchain langchain-openai langchain-anthropic langchain-ollama tiktoken
+    python middleware_deep_dive.py
+
+    # No API key? Falls back to Qwen3.5 via Ollama (must be running locally):
+    #   ollama pull qwen2.5        # or whichever tag you have
+    #   ollama serve
     python middleware_deep_dive.py
 """
 
@@ -36,6 +41,7 @@ from typing import Any, Callable
 # ---------------------------------------------------------------------------
 # Picking a model: OpenAI preferred because tiktoken lets us show real token
 # IDs. Anthropic works too but we can only approximate tokens (no public BPE).
+# No API key? Falls back to Qwen2.5 via Ollama (no key required).
 # ---------------------------------------------------------------------------
 USE_OPENAI = bool(os.getenv("OPENAI_API_KEY"))
 USE_ANTHROPIC = bool(os.getenv("ANTHROPIC_API_KEY"))
@@ -51,7 +57,12 @@ elif USE_ANTHROPIC:
     MODEL_NAME = "claude-3-5-haiku-latest"
     model = ChatAnthropic(model=MODEL_NAME, temperature=0)
 else:
-    raise SystemExit("Set OPENAI_API_KEY or ANTHROPIC_API_KEY first.")
+    from langchain_ollama import ChatOllama
+
+    MODEL_NAME = "qwen2.5"
+    model = ChatOllama(model=MODEL_NAME, temperature=0)
+    print(f"No API key found — using local Ollama model '{MODEL_NAME}'.")
+    print("Make sure Ollama is running: ollama serve")
 
 
 from langchain.agents import create_agent
@@ -284,7 +295,10 @@ def _tokenize_payload(payload: dict[str, Any]) -> None:
         print("tiktoken not installed; pip install tiktoken for full token view.")
         return
 
-    if not USE_OPENAI:
+    if not USE_OPENAI and not USE_ANTHROPIC:
+        print("Ollama/Qwen tokenizer not available via tiktoken; using cl100k_base as approximation.")
+        enc = tiktoken.get_encoding("cl100k_base")
+    elif not USE_OPENAI:
         print("Anthropic tokenizer is proprietary; using cl100k_base as approximation.")
         enc = tiktoken.get_encoding("cl100k_base")
     else:

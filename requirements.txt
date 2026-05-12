@@ -1,6 +1,7 @@
 langchain
 langchain-openai
 langchain-anthropic
+langchain-ollama
 langchain-core
 tiktoken
 debugpy
