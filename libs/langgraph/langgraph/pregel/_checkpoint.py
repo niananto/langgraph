@@ -8,11 +8,11 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import (
     BaseCheckpointSaver,
     Checkpoint,
-    CheckpointMetadata,
 )
 from langgraph.checkpoint.base.id import uuid6
 from langgraph.checkpoint.serde.types import _DeltaSnapshot
 
+from langgraph._internal._config import DELTA_MAX_SUPERSTEPS_SINCE_SNAPSHOT
 from langgraph._internal._typing import MISSING
 from langgraph.channels.base import BaseChannel
 from langgraph.channels.delta import DeltaChannel
@@ -34,28 +34,28 @@ def empty_checkpoint() -> Checkpoint:
     )
 
 
-def _should_snapshot_delta(
-    name: str,
-    ch: DeltaChannel,
-    updates_since_snapshot: Mapping[str, int],
-    *,
-    force: bool,
-) -> bool:
-    """Decide whether `ch` should write a `_DeltaSnapshot` this step.
+def delta_channels_to_snapshot(
+    channels: Mapping[str, BaseChannel],
+    counters_since_delta_snapshot: Mapping[str, tuple[int, int]],
+) -> set[str]:
+    """Return the set of DeltaChannel names that should snapshot now.
 
-    Triggers:
-      * `force` — always snapshot (used by `durability="exit"`).
-      * Update-count: this channel has accumulated at least
-        `snapshot_frequency` updates since its last snapshot. The count
-        is supplied by the caller via `updates_since_snapshot[name]` and
-        is reset to `0` whenever a snapshot fires.
-
-    Version-format-independent: works for `int`, `float`, and `str`
-    versioning schemes alike.
+    A channel snapshots when EITHER its accumulated update count reaches
+    `snapshot_frequency` OR the total supersteps since its last snapshot
+    reaches `DELTA_MAX_SUPERSTEPS_SINCE_SNAPSHOT`. This is a pure
+    predicate — no mutation.
     """
-    if force:
-        return True
-    return updates_since_snapshot.get(name, 0) >= ch.snapshot_frequency
+    result: set[str] = set()
+    for name, ch in channels.items():
+        if not isinstance(ch, DeltaChannel) or not ch.is_available():
+            continue
+        updates, supersteps = counters_since_delta_snapshot.get(name, (0, 0))
+        if (
+            updates >= ch.snapshot_frequency
+            or supersteps >= DELTA_MAX_SUPERSTEPS_SINCE_SNAPSHOT
+        ):
+            result.add(name)
+    return result
 
 
 def create_checkpoint(
@@ -66,34 +66,19 @@ def create_checkpoint(
     id: str | None = None,
     updated_channels: set[str] | None = None,
     get_next_version: GetNextVersion | None = None,
-    force_delta_snapshot: bool = False,
-    updates_since_snapshot: Mapping[str, int] | None = None,
-    new_updates_since_snapshot: dict[str, int] | None = None,
+    channels_to_snapshot: set[str] | None = None,
 ) -> Checkpoint:
-    """Create a checkpoint for the given channels.
+    """Build a new Checkpoint from the previous one and live channel state.
 
-    For each `DeltaChannel`, a `_DeltaSnapshot(value)` blob is written into
-    `channel_values[k]` when this channel has accumulated at least
-    `snapshot_frequency` updates since its last snapshot (counter supplied
-    via `updates_since_snapshot`). Otherwise the channel is omitted from
-    `channel_values`; its `channel_versions` entry still bumps so that the
-    saver tracks the channel and the ancestor walk can replay writes.
-
-    Snapshots are eager: even if the channel had no write this step, a
-    version bump is forced (via `get_next_version`) so `put()` includes
-    the channel in `new_versions` and stores the blob.
-
-    `force_delta_snapshot` ignores the cadence and always snapshots —
-    used by `durability="exit"` where intermediate writes are not stored
-    as ancestor `checkpoint_writes`.
-
-    If `new_updates_since_snapshot` is provided, the function resets the
-    counter to `0` for any channel that snapshotted this step. Counters
-    for channels that did not snapshot are left untouched (the caller is
-    responsible for incrementing them based on `updated_channels`).
+    For each name in `channels_to_snapshot`, a `_DeltaSnapshot(value)` blob
+    is written into `channel_values[k]`. Other delta channels are omitted
+    from `channel_values` — the ancestor walk reconstructs their state
+    from `checkpoint_writes`. Callers compute the set via
+    `delta_channels_to_snapshot(channels, counters)`; defaults to empty
+    (no snapshots) when not provided.
     """
     ts = datetime.now(timezone.utc).isoformat()
-    counts = updates_since_snapshot or {}
+    channels_to_snapshot = channels_to_snapshot or set()
     if channels is None:
         values = checkpoint["channel_values"]
         channel_versions = checkpoint["channel_versions"]
@@ -104,25 +89,23 @@ def create_checkpoint(
             if k not in channel_versions:
                 continue
             ch = channels[k]
-            if (
-                isinstance(ch, DeltaChannel)
-                and ch.is_available()
-                and _should_snapshot_delta(
-                    k,
-                    ch,
-                    counts,
-                    force=force_delta_snapshot,
-                )
-            ):
-                # Eager snapshot: bump version if not already written this step
-                # so put() includes this channel in new_versions and stores blob.
+            if k in channels_to_snapshot:
+                # In exit mode, the snapshot decision is deferred to exit
+                # time (intermediate steps have do_checkpoint=False). The
+                # channel's count may have reached snapshot_frequency over
+                # several supersteps, but the LAST superstep may not have
+                # written to this channel. In that case apply_writes()
+                # (in _algo.py) didn't bump this channel's version, so
+                # saver.put() wouldn't include it in new_versions and
+                # the snapshot blob would be silently dropped. The manual
+                # bump below closes the gap. In sync/async durability this
+                # branch is effectively dead code (the step that pushes
+                # the count to freq always writes the channel).
                 if get_next_version is not None and (
                     updated_channels is None or k not in updated_channels
                 ):
                     channel_versions[k] = get_next_version(channel_versions[k], None)
                 values[k] = _DeltaSnapshot(ch.get())
-                if new_updates_since_snapshot is not None:
-                    new_updates_since_snapshot[k] = 0
             else:
                 v = ch.checkpoint()
                 if v is not MISSING:
@@ -253,17 +236,3 @@ def copy_checkpoint(checkpoint: Checkpoint) -> Checkpoint:
         versions_seen={k: v.copy() for k, v in checkpoint["versions_seen"].items()},
         updated_channels=checkpoint.get("updated_channels", None),
     )
-
-
-def read_delta_updates_since_snapshot(
-    metadata: CheckpointMetadata | None,
-) -> dict[str, int]:
-    """Read the per-channel update counter from checkpoint metadata.
-
-    Returns an empty dict for missing/None metadata; the dict is
-    `total=False` on `CheckpointMetadata`, so absence means "no prior
-    delta-channel activity tracked."
-    """
-    if not metadata:
-        return {}
-    return dict(metadata.get("delta_updates_since_snapshot", {}) or {})
