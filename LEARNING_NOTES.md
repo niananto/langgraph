@@ -31,7 +31,10 @@ uv venv && source .venv/bin/activate          # or: python -m venv .venv
 uv pip install -e libs/checkpoint -e libs/prebuilt -e libs/langgraph
 
 # extras for the middleware deep-dive script
-uv pip install langchain langchain-openai langchain-anthropic langchain-ollama tiktoken requests
+uv pip install langchain langchain-openai langchain-anthropic langchain-ollama tiktoken transformers requests python-dotenv
+
+# copy env template and fill in HF_TOKEN (and optionally API keys)
+cp .env.example .env
 
 # sanity check — should print a path under libs/langgraph/langgraph/__init__.py
 python -c "import langgraph; print(langgraph.__file__)"
@@ -72,8 +75,7 @@ Agent with two tools:
   - `ModelRequest` fields (system_prompt, tools, messages)
   - Tool **JSON-Schemas** via `convert_to_openai_tool`
   - **Provider HTTP payload** (post-langchain conversion, pre-tokenization)
-  - **Real LLaMA 3.1 token IDs** via Ollama `/api/tokenize` (requires
-    Ollama ≥ 0.3.0 — see section below if you get a 404)
+  - **Real LLaMA 3.1 token IDs** via `transformers.AutoTokenizer`
   - **Token → embedding vector** via Ollama `/api/embed`
 - `wrap_model_call` (response side) — raw `AIMessage`, `.tool_calls`,
   `.response_metadata`, `.usage_metadata`
@@ -181,19 +183,22 @@ Pair with breakpoint to map debug events ↔ `tick()` internals.
 
 ## Token → embedding deep-dive (parked, resume here)
 
-`middleware_deep_dive.py` already has `_show_token_embeddings()` wired up,
-but the Ollama `/api/tokenize` endpoint returns 404 on older installs.
+`middleware_deep_dive.py` already has `_show_token_embeddings()` wired up.
 
-**Root cause:** `/api/tokenize`, `/api/detokenize`, and `/api/embed` were
-added in **Ollama 0.3.0** (July 2024). The core `/api/chat` route that
-`ChatOllama` uses is older, so the model works fine but tokenize/embed 404s.
+**HuggingFace access — current status:**
+- Applied for Meta gated access (`meta-llama/Meta-Llama-3.1-8B`) — pending approval.
+- In the meantime the script automatically falls back to `NousResearch/Meta-Llama-3.1-8B`,
+  a public mirror with an identical tokenizer — no token or license form needed.
+- Once HF approval arrives, add `HF_TOKEN=hf_...` to `.env` and the official
+  model will be used instead.
 
-**Fix:** `ollama --version` → if below 0.3.0, update from ollama.com/download.
+**Note:** Ollama does NOT have a `/api/tokenize` endpoint at all (that was a
+mistake in earlier notes). Tokenization is handled by `transformers.AutoTokenizer`.
 
-Once Ollama ≥ 0.3.0 the script will automatically:
-1. Call `/api/tokenize` → real LLaMA 3.1 BPE token IDs (128 256-token vocab).
-2. Call `/api/detokenize` per ID → decoded subword string.
-3. Call `/api/embed` per token → 4096-dim contextualised vector.
+Once the tokenizer loads the script will automatically:
+1. Return exact LLaMA 3.1 BPE token IDs (128 256-token vocab).
+2. Decode each token ID back to its subword string.
+3. Call Ollama `/api/embed` per token → 4096-dim contextualised vector.
 
 **Going further — raw embedding matrix lookup (no Ollama needed):**
 
@@ -240,8 +245,8 @@ Key facts about LLaMA 3.1 8B embeddings:
   `middleware_deep_dive.py` under debugger) — see the same loop with
   real tool execution, multiple super-steps, and `ToolNode` channel
   writes.
-- Update Ollama to ≥ 0.3.0 and re-run to get the real token ID + embedding
-  output from `_show_real_tokens()` / `_show_token_embeddings()`.
+- Once HF token approved: confirm official tokenizer loads correctly and
+  remove the NousResearch fallback note from here.
 - Add a `wrap_tool_call` hook to `WireTapMiddleware` so tool inputs /
   outputs also get dumped per call (currently only model edges are
   tapped).

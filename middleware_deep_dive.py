@@ -27,6 +27,7 @@ Run (no API key needed — uses local Ollama):
     # For real tokenization (optional):
     #   accept Meta license at huggingface.co/meta-llama/Meta-Llama-3.1-8B
     #   add HF_TOKEN=hf_... to your .env file
+    #   (falls back to NousResearch public mirror automatically if no token)
     python middleware_deep_dive.py
 
 With an API key (OpenAI or Anthropic takes priority):
@@ -143,22 +144,36 @@ TOOLS = [search_flights, book_flight]
 # ---------------------------------------------------------------------------
 # Tokenizer helpers — real LLaMA 3.1 token IDs via transformers.
 #
-# Note: Ollama does NOT expose a /api/tokenize endpoint. Real tokenization
-# requires AutoTokenizer from transformers, which downloads just the
-# tokenizer files (~a few MB) from HuggingFace.
+# Ollama does NOT expose a /api/tokenize endpoint. Real tokenization
+# requires AutoTokenizer from transformers (tokenizer files only, ~few MB).
 #
-# One-time setup:
-#   pip install transformers
-#   Accept Meta's license at huggingface.co/meta-llama/Meta-Llama-3.1-8B
-#   Add HF_TOKEN=hf_... to your .env file
+# Priority:
+#   1. meta-llama/Meta-Llama-3.1-8B  (official, gated — needs HF_TOKEN in .env
+#                                      + Meta license approval)
+#   2. NousResearch/Meta-Llama-3.1-8B (public mirror, identical tokenizer,
+#                                      no token or license form required)
 # ---------------------------------------------------------------------------
 def _load_llama_tokenizer():
-    """Load LLaMA 3.1 tokenizer from HuggingFace (tokenizer files only, ~few MB)."""
+    """Load LLaMA 3.1 tokenizer from HuggingFace (tokenizer files only, ~few MB).
+
+    Tries the official gated model first (requires Meta license approval +
+    HF_TOKEN in .env). Falls back to NousResearch's public mirror, which has
+    an identical tokenizer and requires no token or license acceptance.
+    """
     from transformers import AutoTokenizer
 
-    hf_model = "meta-llama/Meta-Llama-3.1-8B"
     hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN")
-    return AutoTokenizer.from_pretrained(hf_model, token=hf_token)
+
+    if hf_token:
+        try:
+            return AutoTokenizer.from_pretrained(
+                "meta-llama/Meta-Llama-3.1-8B", token=hf_token
+            )
+        except Exception:
+            pass  # fall through to public mirror
+
+    # Public mirror — no token or license form required
+    return AutoTokenizer.from_pretrained("NousResearch/Meta-Llama-3.1-8B")
 
 
 def _ollama_embed(text: str) -> list[float]:
@@ -347,8 +362,8 @@ def _show_real_tokens(rendered: str) -> None:
         print(
             f"\n(Could not load LLaMA tokenizer: {e})"
             "\nSetup: pip install transformers"
-            "\n       accept Meta license at huggingface.co/meta-llama/Meta-Llama-3.1-8B"
-            "\n       add HF_TOKEN=hf_... to your .env file"
+            "\n       tokenizer will be downloaded from NousResearch/Meta-Llama-3.1-8B"
+            "\n       (or set HF_TOKEN in .env for the official Meta model)"
         )
         return
 
