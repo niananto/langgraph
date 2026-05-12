@@ -25,8 +25,8 @@ Run:
     uv pip install langchain langchain-openai langchain-anthropic langchain-ollama tiktoken
     python middleware_deep_dive.py
 
-    # No API key? Falls back to Qwen2.5 via Ollama (must be running locally):
-    #   ollama pull qwen2.5        # or whichever tag you have
+    # No API key? Falls back to Qwen3.5 via Ollama (must be running locally):
+    #   ollama pull qwen3.5        # or whichever tag you have
     #   ollama serve
     python middleware_deep_dive.py
 """
@@ -41,7 +41,7 @@ from typing import Any, Callable
 # ---------------------------------------------------------------------------
 # Picking a model: OpenAI preferred because tiktoken lets us show real token
 # IDs. Anthropic works too but we can only approximate tokens (no public BPE).
-# No API key? Falls back to Qwen2.5 via Ollama (no key required).
+# No API key? Falls back to Qwen3.5 via Ollama (no key required).
 # ---------------------------------------------------------------------------
 USE_OPENAI = bool(os.getenv("OPENAI_API_KEY"))
 USE_ANTHROPIC = bool(os.getenv("ANTHROPIC_API_KEY"))
@@ -59,7 +59,7 @@ elif USE_ANTHROPIC:
 else:
     from langchain_ollama import ChatOllama
 
-    MODEL_NAME = "qwen2.5"
+    MODEL_NAME = "qwen3.5"
     model = ChatOllama(model=MODEL_NAME, temperature=0)
     print(f"No API key found — using local Ollama model '{MODEL_NAME}'.")
     print("Make sure Ollama is running: ollama serve")
