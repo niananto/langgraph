@@ -25,7 +25,7 @@ Run:
     uv pip install langchain langchain-openai langchain-anthropic langchain-ollama tiktoken
     python middleware_deep_dive.py
 
-    # No API key? Falls back to Qwen3.5 via Ollama (must be running locally):
+    # No API key? Falls back to Qwen2.5 via Ollama (must be running locally):
     #   ollama pull qwen2.5        # or whichever tag you have
     #   ollama serve
     python middleware_deep_dive.py
@@ -101,8 +101,6 @@ def dump_messages(messages: list[BaseMessage], label: str) -> None:
         )
         print(f"[{i}] {kind}  name={name}  tool_call_id={tc_id}")
         print(f"     content: {content_preview!r}")
-        # AIMessage may carry tool_calls — these are STRUCTURED views of what
-        # the LLM emitted as text/JSON in its raw output.
         tool_calls = getattr(m, "tool_calls", None)
         if tool_calls:
             print(f"     tool_calls: {json.dumps(tool_calls, indent=2, default=str)}")
@@ -115,7 +113,6 @@ def dump_messages(messages: list[BaseMessage], label: str) -> None:
 @tool
 def search_flights(origin: str, destination: str, date: str) -> str:
     """Search flights between two airports on a given date (YYYY-MM-DD)."""
-    # Hardcoded fake DB so we can focus on the orchestration, not flight data.
     return json.dumps(
         [
             {"flight_id": "AA101", "carrier": "American", "depart": "08:00", "price_usd": 245},
@@ -144,13 +141,11 @@ class WireTapMiddleware(AgentMiddleware):
 
     name = "wiretap"
 
-    # -- before model --------------------------------------------------------
     def before_model(self, state: AgentState, runtime) -> dict[str, Any] | None:
         banner("[BEFORE MODEL]  state snapshot the orchestrator just built")
         dump_messages(state["messages"], "state['messages']")
-        return None  # don't mutate state
+        return None
 
-    # -- wrap model call -----------------------------------------------------
     def wrap_model_call(
         self,
         request: ModelRequest,
@@ -158,43 +153,33 @@ class WireTapMiddleware(AgentMiddleware):
     ) -> ModelResponse:
         banner("[WRAP MODEL]  ModelRequest that LangGraph hands to the adapter")
 
-        # --- A. Python-object view --------------------------------------
         print(f"\nmodel:         {getattr(request, 'model', None) or type(model).__name__}")
         print(f"system_prompt: {getattr(request, 'system_prompt', None)!r}")
         print(f"tool_choice:   {getattr(request, 'tool_choice', None)!r}")
         print(f"#tools:        {len(request.tools) if request.tools else 0}")
         dump_messages(request.messages, "request.messages")
 
-        # --- B. Tool schemas as the LLM will see them -------------------
-        # `@tool` builds a JSON-Schema. Provider adapter converts that to
-        # OpenAI 'tools' format or Anthropic 'tools' format.
         banner("Tool JSON-Schemas (this is what the model is told about tools)", ch="-")
         try:
             from langchain_core.utils.function_calling import convert_to_openai_tool
 
             schemas = [convert_to_openai_tool(t) for t in (request.tools or [])]
             print(json.dumps(schemas, indent=2))
-        except Exception as e:  # pragma: no cover
+        except Exception as e:
             print(f"(could not render tool schemas: {e})")
 
-        # --- C. Provider HTTP payload (the actual wire format) ----------
         banner("Provider HTTP payload (post-conversion, pre-tokenization)", ch="-")
         wire_payload = _to_wire_payload(request)
         print(json.dumps(wire_payload, indent=2, default=str))
 
-        # --- D. Tokenizer view ------------------------------------------
         banner("Tokenizer view — what the LLM literally consumes", ch="-")
         _tokenize_payload(wire_payload)
 
-        # --- Now call the model and print response ----------------------
         response = handler(request)
 
         banner("[WRAP MODEL]  ModelResponse from adapter (raw AIMessage)")
-        # `response.result` is list[BaseMessage] (usually 1 AIMessage)
         for msg in response.result:
             dump_messages([msg], "AI response message")
-            # `.response_metadata` carries provider stop_reason, token usage,
-            # model fingerprint — proof of which physical model answered.
             print("\nresponse_metadata:")
             print(json.dumps(getattr(msg, "response_metadata", {}), indent=2, default=str))
             print("\nusage_metadata:")
@@ -202,13 +187,11 @@ class WireTapMiddleware(AgentMiddleware):
 
         return response
 
-    # -- after model ---------------------------------------------------------
     def after_model(self, state: AgentState, runtime) -> dict[str, Any] | None:
         last = state["messages"][-1]
         banner("[AFTER MODEL]  what the orchestrator appended to state")
         dump_messages([last], "newest message")
 
-        # If LLM asked for tools, the ToolNode will execute them next.
         if isinstance(last, AIMessage) and last.tool_calls:
             print("\n>>> Orchestrator will now run ToolNode for these tool_calls.")
         else:
@@ -222,13 +205,6 @@ class WireTapMiddleware(AgentMiddleware):
 def _to_wire_payload(request: ModelRequest) -> dict[str, Any]:
     """Build the JSON dict that would hit the provider's REST API."""
     from langchain_core.utils.function_calling import convert_to_openai_tool
-
-    # OpenAI / Anthropic both accept a near-OpenAI shape via langchain. We
-    # render the OpenAI shape so the structure is identical for both
-    # learning targets.
-    from langchain_community.adapters.openai import (  # type: ignore
-        convert_message_to_dict,
-    ) if False else (None,)  # placeholder so import error doesn't break
 
     # langchain_openai ships the converter we actually want:
     try:
@@ -307,9 +283,6 @@ def _tokenize_payload(payload: dict[str, Any]) -> None:
         except KeyError:
             enc = tiktoken.get_encoding("o200k_base")
 
-    # Render messages roughly the way OpenAI's chat-template renders them
-    # before tokenization. Real server uses internal Harmony format; this
-    # is a close, pedagogically-useful approximation.
     rendered_parts: list[str] = []
     for m in payload["messages"]:
         role = m["role"]
@@ -320,7 +293,6 @@ def _tokenize_payload(payload: dict[str, Any]) -> None:
                 rendered_parts.append(
                     f"<|tool_call|>{tc['function']['name']}({tc['function']['arguments']})<|/tool_call|>"
                 )
-    # Tool schemas get prepended (provider-side) as a serialized block.
     tool_block = json.dumps(payload.get("tools", []))
     rendered = (
         f"<|tools|>{tool_block}<|/tools|>\n" + "\n".join(rendered_parts) + "\n<|im_start|>assistant\n"
@@ -335,7 +307,6 @@ def _tokenize_payload(payload: dict[str, Any]) -> None:
     print("First 40 tokens decoded individually:")
     for tid in ids[:40]:
         piece = enc.decode([tid])
-        # show invisible/special characters explicitly
         print(f"  {tid:>7}  {piece!r}")
 
     print(
