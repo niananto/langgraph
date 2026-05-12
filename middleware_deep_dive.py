@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import textwrap
 from typing import Any, Callable
 
@@ -46,6 +47,11 @@ import requests
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Allow Unicode output (arrows, math symbols) on Windows terminals that default
+# to a narrow encoding like cp1252.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 # ---------------------------------------------------------------------------
 # Model selection. OpenAI → Anthropic → LLaMA 3.1 via Ollama (no key needed).
@@ -167,13 +173,18 @@ def _load_llama_tokenizer():
     if hf_token:
         try:
             return AutoTokenizer.from_pretrained(
-                "meta-llama/Meta-Llama-3.1-8B", token=hf_token
+                "meta-llama/Meta-Llama-3.1-8B",
+                token=hf_token,
+                clean_up_tokenization_spaces=False,
             )
         except Exception:
             pass  # fall through to public mirror
 
     # Public mirror — no token or license form required
-    return AutoTokenizer.from_pretrained("NousResearch/Meta-Llama-3.1-8B")
+    return AutoTokenizer.from_pretrained(
+        "NousResearch/Meta-Llama-3.1-8B",
+        clean_up_tokenization_spaces=False,
+    )
 
 
 def _ollama_embed(text: str) -> list[float]:
@@ -316,7 +327,7 @@ def _tokenize_payload(payload: dict[str, Any]) -> None:
                with Meta's custom merges — that's why tiktoken's built-in
                encodings don't match exactly). Each token → one integer ID.
       Step 3 — Embed: the integer IDs index into the embedding matrix
-               E ∈ ℝ^{128256 × 4096}. Row E[token_id] is a 4096-dim vector —
+               E in R^{128256 x 4096}. Row E[token_id] is a 4096-dim vector —
                that is the only input the first transformer layer ever sees.
                Because Meta released the weights, you can inspect any row:
                    from transformers import AutoModel
@@ -386,7 +397,7 @@ def _show_real_tokens(rendered: str) -> None:
         "\n    tool call by emitting tokens matching a learned format."
     )
 
-    banner("Token → embedding vector (first 5 tokens via Ollama /api/embed)", ch="-")
+    banner("Token -> embedding vector (first 5 tokens via Ollama /api/embed)", ch="-")
     _show_token_embeddings(ids[:5], tokenizer)
 
 

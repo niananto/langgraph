@@ -186,11 +186,10 @@ Pair with breakpoint to map debug events ↔ `tick()` internals.
 `middleware_deep_dive.py` already has `_show_token_embeddings()` wired up.
 
 **HuggingFace access — current status:**
-- Applied for Meta gated access (`meta-llama/Meta-Llama-3.1-8B`) — pending approval.
-- In the meantime the script automatically falls back to `NousResearch/Meta-Llama-3.1-8B`,
-  a public mirror with an identical tokenizer — no token or license form needed.
-- Once HF approval arrives, add `HF_TOKEN=hf_...` to `.env` and the official
-  model will be used instead.
+- Meta gated access (`meta-llama/Meta-Llama-3.1-8B`) — **approved**.
+- Add `HF_TOKEN=hf_...` to `.env` and the official model will be used.
+- The script automatically falls back to `NousResearch/Meta-Llama-3.1-8B`
+  (public mirror, identical tokenizer) if no token is present.
 
 **Note:** Ollama does NOT have a `/api/tokenize` endpoint at all (that was a
 mistake in earlier notes). Tokenization is handled by `transformers.AutoTokenizer`.
@@ -245,8 +244,8 @@ Key facts about LLaMA 3.1 8B embeddings:
   `middleware_deep_dive.py` under debugger) — see the same loop with
   real tool execution, multiple super-steps, and `ToolNode` channel
   writes.
-- Once HF token approved: confirm official tokenizer loads correctly and
-  remove the NousResearch fallback note from here.
+- Confirmed official `meta-llama/Meta-Llama-3.1-8B` tokenizer loads correctly
+  with approved HF token.
 - Add a `wrap_tool_call` hook to `WireTapMiddleware` so tool inputs /
   outputs also get dumped per call (currently only model edges are
   tapped).
