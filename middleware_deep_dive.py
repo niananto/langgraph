@@ -9,25 +9,25 @@ each step so you can SEE:
      (messages + tool JSON-Schemas + system prompt).
   3. The provider HTTP payload (what really goes on the wire) — JSON dicts
      after langchain's message-to-provider conversion.
-  4. The provider tokenizer view: token IDs + decoded chunks + special
-     tokens (`<|im_start|>`, `<|im_end|>`, etc). This is what the LLM
-     literally consumes — there are no Python "messages", only a single
-     token sequence.
-  5. The raw `ModelResponse` (AIMessage) — tool_calls are JSON args the
-     model emitted as text; the SDK parses them into structured fields.
-  6. The ToolMessage round-trip — string result fed back as another
-     turn in the message list.
+  4. The REAL tokenizer view via Ollama's /api/tokenize — actual LLaMA 3.1
+     token IDs, not tiktoken approximations.
+  5. Token → embedding vector lookup: each token ID maps to a row in the
+     model's embedding matrix (shape: [vocab_size=128256, hidden_dim=4096]).
+     LLaMA 3's weights are public (Meta license), so you can inspect any
+     token's vector. We query Ollama's /api/embed as a proxy; for raw matrix
+     access see the "Raw embedding lookup" note at the bottom.
+  6. The raw `ModelResponse` (AIMessage) — tool_calls, response_metadata,
+     usage_metadata.
+  7. The ToolMessage round-trip.
 
-Run:
-    # inside your langgraph venv (uv-managed earlier in this session)
-    export OPENAI_API_KEY=sk-...        # or ANTHROPIC_API_KEY=...
-    # extras you may need:
-    uv pip install langchain langchain-openai langchain-anthropic langchain-ollama tiktoken
+Run (no API key needed — uses local Ollama):
+    ollama pull llama3.1:8b
+    ollama serve
+    uv pip install langchain langchain-openai langchain-anthropic langchain-ollama tiktoken requests
     python middleware_deep_dive.py
 
-    # No API key? Falls back to Qwen3.5 via Ollama (must be running locally):
-    #   ollama pull qwen3.5        # or whichever tag you have
-    #   ollama serve
+With an API key (OpenAI or Anthropic takes priority):
+    export OPENAI_API_KEY=sk-...
     python middleware_deep_dive.py
 """
 
@@ -38,13 +38,14 @@ import os
 import textwrap
 from typing import Any, Callable
 
+import requests
+
 # ---------------------------------------------------------------------------
-# Picking a model: OpenAI preferred because tiktoken lets us show real token
-# IDs. Anthropic works too but we can only approximate tokens (no public BPE).
-# No API key? Falls back to Qwen3.5 via Ollama (no key required).
+# Model selection. OpenAI → Anthropic → LLaMA 3.1 via Ollama (no key needed).
 # ---------------------------------------------------------------------------
 USE_OPENAI = bool(os.getenv("OPENAI_API_KEY"))
 USE_ANTHROPIC = bool(os.getenv("ANTHROPIC_API_KEY"))
+OLLAMA_BASE = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
 if USE_OPENAI:
     from langchain_openai import ChatOpenAI
@@ -59,9 +60,10 @@ elif USE_ANTHROPIC:
 else:
     from langchain_ollama import ChatOllama
 
-    MODEL_NAME = "qwen3.5"
+    MODEL_NAME = "llama3.1:8b"
     model = ChatOllama(model=MODEL_NAME, temperature=0)
     print(f"No API key found — using local Ollama model '{MODEL_NAME}'.")
+    print(f"Ollama expected at: {OLLAMA_BASE}")
     print("Make sure Ollama is running: ollama serve")
 
 
@@ -83,7 +85,7 @@ from langchain_core.tools import tool
 
 
 # ---------------------------------------------------------------------------
-# Pretty printing helpers.  Big banners so each step pops in terminal.
+# Pretty printing helpers.
 # ---------------------------------------------------------------------------
 def banner(title: str, ch: str = "=") -> None:
     print(f"\n{ch * 78}\n{title}\n{ch * 78}")
@@ -107,8 +109,7 @@ def dump_messages(messages: list[BaseMessage], label: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tools.  @tool decorator turns the Python signature + docstring into a
-# JSON-Schema that gets shipped to the LLM as part of the request.
+# Tools.
 # ---------------------------------------------------------------------------
 @tool
 def search_flights(origin: str, destination: str, date: str) -> str:
@@ -134,7 +135,43 @@ TOOLS = [search_flights, book_flight]
 
 
 # ---------------------------------------------------------------------------
-# THE WIRETAP MIDDLEWARE.  Sits on every loop edge.
+# Ollama tokenizer helpers — real LLaMA 3.1 token IDs, not approximations.
+# ---------------------------------------------------------------------------
+def _ollama_tokenize(text: str) -> list[int]:
+    """Return real LLaMA 3.1 token IDs for `text` via Ollama's tokenize API."""
+    resp = requests.post(
+        f"{OLLAMA_BASE}/api/tokenize",
+        json={"model": MODEL_NAME, "prompt": text},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()["tokens"]
+
+
+def _ollama_detokenize(token_ids: list[int]) -> str:
+    """Convert a list of token IDs back to a string via Ollama's detokenize API."""
+    resp = requests.post(
+        f"{OLLAMA_BASE}/api/detokenize",
+        json={"model": MODEL_NAME, "tokens": token_ids},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()["content"]
+
+
+def _ollama_embed(text: str) -> list[float]:
+    """Get the embedding vector for `text` from Ollama."""
+    resp = requests.post(
+        f"{OLLAMA_BASE}/api/embed",
+        json={"model": MODEL_NAME, "input": text},
+        timeout=60,
+    )
+    resp.raise_for_status()
+    return resp.json()["embeddings"][0]
+
+
+# ---------------------------------------------------------------------------
+# THE WIRETAP MIDDLEWARE.
 # ---------------------------------------------------------------------------
 class WireTapMiddleware(AgentMiddleware):
     """Print everything crossing orchestration <-> LLM <-> tools."""
@@ -172,7 +209,7 @@ class WireTapMiddleware(AgentMiddleware):
         wire_payload = _to_wire_payload(request)
         print(json.dumps(wire_payload, indent=2, default=str))
 
-        banner("Tokenizer view — what the LLM literally consumes", ch="-")
+        banner("Tokenizer view — real LLaMA 3.1 token IDs via Ollama", ch="-")
         _tokenize_payload(wire_payload)
 
         response = handler(request)
@@ -200,17 +237,15 @@ class WireTapMiddleware(AgentMiddleware):
 
 
 # ---------------------------------------------------------------------------
-# Provider payload conversion + tokenizer view.
+# Provider payload conversion.
 # ---------------------------------------------------------------------------
 def _to_wire_payload(request: ModelRequest) -> dict[str, Any]:
     """Build the JSON dict that would hit the provider's REST API."""
     from langchain_core.utils.function_calling import convert_to_openai_tool
 
-    # langchain_openai ships the converter we actually want:
     try:
         from langchain_openai.chat_models.base import _convert_message_to_dict
     except Exception:
-        # fallback minimal converter
         def _convert_message_to_dict(m: BaseMessage) -> dict[str, Any]:  # type: ignore
             role = {
                 "HumanMessage": "user",
@@ -224,10 +259,7 @@ def _to_wire_payload(request: ModelRequest) -> dict[str, Any]:
                     {
                         "id": tc["id"],
                         "type": "function",
-                        "function": {
-                            "name": tc["name"],
-                            "arguments": json.dumps(tc["args"]),
-                        },
+                        "function": {"name": tc["name"], "arguments": json.dumps(tc["args"])},
                     }
                     for tc in m.tool_calls
                 ]
@@ -241,83 +273,160 @@ def _to_wire_payload(request: ModelRequest) -> dict[str, Any]:
     for m in request.messages:
         messages_wire.append(_convert_message_to_dict(m))
 
-    payload: dict[str, Any] = {
+    return {
         "model": MODEL_NAME,
         "messages": messages_wire,
         "tools": [convert_to_openai_tool(t) for t in (request.tools or [])],
         "tool_choice": getattr(request, "tool_choice", None) or "auto",
         "temperature": 0,
     }
-    return payload
 
 
+# ---------------------------------------------------------------------------
+# Tokenizer + embedding view.
+# ---------------------------------------------------------------------------
 def _tokenize_payload(payload: dict[str, Any]) -> None:
-    """Show what the LLM literally consumes: token IDs + decoded text.
+    """Show real LLaMA 3.1 token IDs and token → vector mappings.
 
-    KEY MENTAL MODEL:
-      - The model does NOT see a list of message objects.
-      - The SDK renders the message list into ONE big string using a
-        provider-specific chat template, then tokenizes that string into
-        a single sequence of integer token IDs.
-      - Message boundaries become *special tokens* inside the sequence
-        (e.g. `<|im_start|>user`, `<|im_end|>` for OpenAI Harmony /
-        ChatML; `Human:` / `Assistant:` style for older models).
-      - Tool definitions are injected into the system message (or a
-        special tool block) BEFORE tokenization.
+    KEY MENTAL MODEL (same for every transformer LLM):
+      Step 1 — Render: the message list is flattened into one string using
+               the model's chat template. For LLaMA 3.1 this is the
+               <|begin_of_text|> / <|start_header_id|> / <|end_header_id|>
+               / <|eot_id|> format. Tool schemas are injected into the system
+               message as JSON text.
+      Step 2 — Tokenize: the string is split into subword tokens by BPE.
+               LLaMA 3 uses a 128,256-token vocabulary (tiktoken-based, but
+               with Meta's custom merges — that's why tiktoken's built-in
+               encodings don't match exactly). Each token → one integer ID.
+      Step 3 — Embed: the integer IDs index into the embedding matrix
+               E ∈ ℝ^{128256 × 4096}. Row E[token_id] is a 4096-dim vector —
+               that is the only input the first transformer layer ever sees.
+               Because Meta released the weights, you can inspect any row:
+                   from transformers import AutoModel
+                   m = AutoModel.from_pretrained("meta-llama/Meta-Llama-3.1-8B")
+                   E = m.model.embed_tokens.weight          # [128256, 4096]
+                   vec = E[token_id].detach().numpy()       # [4096]
     """
+    # --- render the chat template the way LLaMA 3.1 expects it -------------
+    rendered_parts: list[str] = ["<|begin_of_text|>"]
+    for m in payload["messages"]:
+        role = m["role"]
+        content = m.get("content") or ""
+        rendered_parts.append(
+            f"<|start_header_id|>{role}<|end_header_id|>\n\n{content}<|eot_id|>"
+        )
+        if "tool_calls" in m:
+            for tc in m["tool_calls"]:
+                rendered_parts.append(
+                    f"<|start_header_id|>tool_call<|end_header_id|>\n\n"
+                    f"{tc['function']['name']}({tc['function']['arguments']})<|eot_id|>"
+                )
+    # Tool schemas go into a special block before the assistant turn
+    tool_block = json.dumps(payload.get("tools", []))
+    rendered_parts.insert(
+        1,
+        f"<|start_header_id|>system<|end_header_id|>\n\n[TOOLS]{tool_block}[/TOOLS]<|eot_id|>",
+    )
+    rendered_parts.append("<|start_header_id|>assistant<|end_header_id|>\n\n")
+    rendered = "".join(rendered_parts)
+
+    print("Rendered chat-template string (LLaMA 3.1 format, first 1200 chars):")
+    print(textwrap.indent(rendered[:1200] + ("..." if len(rendered) > 1200 else ""), "    "))
+
+    # --- real tokenization via Ollama ---------------------------------------
+    if not USE_OPENAI and not USE_ANTHROPIC:
+        _show_real_tokens(rendered)
+    else:
+        # For OpenAI/Anthropic we fall back to tiktoken as an approximation
+        _show_tiktoken_approx(rendered)
+
+
+def _show_real_tokens(rendered: str) -> None:
+    """Use Ollama's /api/tokenize + /api/detokenize for exact LLaMA 3.1 IDs."""
+    try:
+        ids = _ollama_tokenize(rendered)
+    except Exception as e:
+        print(f"\n(Ollama tokenize failed: {e} — is Ollama running?)")
+        return
+
+    print(f"\nTotal tokens (exact, from Ollama): {len(ids)}")
+    print("First 40 token IDs:", ids[:40])
+
+    print("\nFirst 40 tokens decoded individually (Ollama detokenize):")
+    for i, tid in enumerate(ids[:40]):
+        try:
+            piece = _ollama_detokenize([tid])
+        except Exception:
+            piece = "?"
+        print(f"  [{i:>2}]  id={tid:>7}  decoded={piece!r}")
+
+    print(
+        "\nTakeaways:"
+        "\n  * No 'messages' at the model layer — one flat token sequence."
+        "\n  * LLaMA 3.1 role boundaries: <|start_header_id|>user<|end_header_id|>"
+        "\n    These ARE tokens (special IDs the model learned during training)."
+        "\n  * Tool schemas are plain JSON text tokens; the model generates a"
+        "\n    tool call by emitting tokens matching a learned format."
+    )
+
+    banner("Token → embedding vector (first 5 tokens via Ollama /api/embed)", ch="-")
+    _show_token_embeddings(ids[:5])
+
+
+def _show_token_embeddings(token_ids: list[int]) -> None:
+    """Show the embedding vector for each token.
+
+    Ollama's /api/embed runs the full model encoder, so the vectors are
+    contextualised. For the raw embedding-matrix row (E[token_id] with no
+    context), load the weights directly:
+
+        from transformers import AutoModel
+        m = AutoModel.from_pretrained("meta-llama/Meta-Llama-3.1-8B")
+        E = m.model.embed_tokens.weight          # shape [128256, 4096]
+        vec = E[token_id].detach().float().numpy()
+    """
+    print(
+        "Note: vectors below come from Ollama /api/embed (contextualised).\n"
+        "For the raw embedding-matrix row, see the docstring above.\n"
+    )
+    for tid in token_ids:
+        try:
+            decoded = _ollama_detokenize([tid])
+        except Exception:
+            decoded = "?"
+        try:
+            vec = _ollama_embed(decoded if decoded.strip() else " ")
+            dim = len(vec)
+            preview = [round(v, 4) for v in vec[:6]]
+            print(f"  id={tid:>7}  token={decoded!r:<15}  dim={dim}  vec[:6]={preview}")
+        except Exception as e:
+            print(f"  id={tid:>7}  token={decoded!r:<15}  embed failed: {e}")
+
+
+def _show_tiktoken_approx(rendered: str) -> None:
+    """Fallback for OpenAI/Anthropic: tiktoken approximation."""
     try:
         import tiktoken
     except ImportError:
-        print("tiktoken not installed; pip install tiktoken for full token view.")
+        print("tiktoken not installed; pip install tiktoken for token view.")
         return
 
-    if not USE_OPENAI and not USE_ANTHROPIC:
-        print("Ollama/Qwen tokenizer not available via tiktoken; using cl100k_base as approximation.")
-        enc = tiktoken.get_encoding("cl100k_base")
-    elif not USE_OPENAI:
-        print("Anthropic tokenizer is proprietary; using cl100k_base as approximation.")
-        enc = tiktoken.get_encoding("cl100k_base")
-    else:
+    if USE_OPENAI:
         try:
             enc = tiktoken.encoding_for_model(MODEL_NAME)
         except KeyError:
             enc = tiktoken.get_encoding("o200k_base")
-
-    rendered_parts: list[str] = []
-    for m in payload["messages"]:
-        role = m["role"]
-        content = m.get("content") or ""
-        rendered_parts.append(f"<|im_start|>{role}\n{content}<|im_end|>")
-        if "tool_calls" in m:
-            for tc in m["tool_calls"]:
-                rendered_parts.append(
-                    f"<|tool_call|>{tc['function']['name']}({tc['function']['arguments']})<|/tool_call|>"
-                )
-    tool_block = json.dumps(payload.get("tools", []))
-    rendered = (
-        f"<|tools|>{tool_block}<|/tools|>\n" + "\n".join(rendered_parts) + "\n<|im_start|>assistant\n"
-    )
-
-    print("Rendered chat-template string (approximation):")
-    print(textwrap.indent(rendered[:1200] + ("..." if len(rendered) > 1200 else ""), "    "))
+    else:
+        print("Anthropic tokenizer is proprietary; using cl100k_base as approximation.")
+        enc = tiktoken.get_encoding("cl100k_base")
 
     ids = enc.encode(rendered, disallowed_special=())
-    print(f"\nTotal tokens (approx): {len(ids)}")
+    print(f"\nTotal tokens (approx via tiktoken): {len(ids)}")
     print("First 40 token IDs:", ids[:40])
     print("First 40 tokens decoded individually:")
     for tid in ids[:40]:
         piece = enc.decode([tid])
         print(f"  {tid:>7}  {piece!r}")
-
-    print(
-        "\nTakeaways:"
-        "\n  * No 'messages' exist at the model layer — only this token stream."
-        "\n  * Role headers (`<|im_start|>user`) ARE tokens; the model learned"
-        "\n    that pattern during training, that's how it knows whose turn it is."
-        "\n  * Tool schemas live INSIDE the prompt as text; the model generates"
-        "\n    a tool call by emitting tokens that match a learned tool-call format,"
-        "\n    which the SDK then parses into structured `tool_calls`."
-    )
 
 
 # ---------------------------------------------------------------------------
