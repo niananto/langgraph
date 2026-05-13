@@ -1,0 +1,1017 @@
+No API key found — using local Ollama model 'qwen3.5'.
+Make sure Ollama is running: ollama serve
+
+##############################################################################
+USER INPUT
+##############################################################################
+Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.
+
+==============================================================================
+[BEFORE MODEL]  state snapshot the orchestrator just built
+==============================================================================
+
+--- state['messages'] (1 messages) ---
+[0] HumanMessage  name=None  tool_call_id=None
+     content: 'Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.'
+
+==============================================================================
+[WRAP MODEL]  ModelRequest that LangGraph hands to the adapter
+==============================================================================
+
+model:         output_version=None model='qwen3.5' temperature=0.0
+system_prompt: 'You are a flight booking assistant. Use `search_flights` to find options, then `book_flight` to confirm one. Always pick the cheapest option unless the user says otherwise.'
+tool_choice:   None
+#tools:        2
+
+--- request.messages (1 messages) ---
+[0] HumanMessage  name=None  tool_call_id=None
+     content: 'Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.'
+
+------------------------------------------------------------------------------
+Tool JSON-Schemas (this is what the model is told about tools)
+------------------------------------------------------------------------------
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "search_flights",
+      "description": "Search flights between two airports on a given date (YYYY-MM-DD).",
+      "parameters": {
+        "properties": {
+          "origin": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "date"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "book_flight",
+      "description": "Book a specific flight by its flight_id for the named passenger.",
+      "parameters": {
+        "properties": {
+          "flight_id": {
+            "type": "string"
+          },
+          "passenger_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "flight_id",
+          "passenger_name"
+        ],
+        "type": "object"
+      }
+    }
+  }
+]
+
+------------------------------------------------------------------------------
+Provider HTTP payload (post-conversion, pre-tokenization)
+------------------------------------------------------------------------------
+{
+  "model": "qwen3.5",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a flight booking assistant. Use `search_flights` to find options, then `book_flight` to confirm one. Always pick the cheapest option unless the user says otherwise."
+    },
+    {
+      "content": "Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.",
+      "role": "user"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "search_flights",
+        "description": "Search flights between two airports on a given date (YYYY-MM-DD).",
+        "parameters": {
+          "properties": {
+            "origin": {
+              "type": "string"
+            },
+            "destination": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "origin",
+            "destination",
+            "date"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "book_flight",
+        "description": "Book a specific flight by its flight_id for the named passenger.",
+        "parameters": {
+          "properties": {
+            "flight_id": {
+              "type": "string"
+            },
+            "passenger_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "flight_id",
+            "passenger_name"
+          ],
+          "type": "object"
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto",
+  "temperature": 0
+}
+
+------------------------------------------------------------------------------
+Tokenizer view — what the LLM literally consumes
+------------------------------------------------------------------------------
+Ollama/Qwen tokenizer not available via tiktoken; using cl100k_base as approximation.
+Rendered chat-template string (approximation):
+    <|tools|>[{"type": "function", "function": {"name": "search_flights", "description": "Search flights between two airports on a given date (YYYY-MM-DD).", "parameters": {"properties": {"origin": {"type": "string"}, "destination": {"type": "string"}, "date": {"type": "string"}}, "required": ["origin", "destination", "date"], "type": "object"}}}, {"type": "function", "function": {"name": "book_flight", "description": "Book a specific flight by its flight_id for the named passenger.", "parameters": {"properties": {"flight_id": {"type": "string"}, "passenger_name": {"type": "string"}}, "required": ["flight_id", "passenger_name"], "type": "object"}}}]<|/tools|>
+    <|im_start|>system
+    You are a flight booking assistant. Use `search_flights` to find options, then `book_flight` to confirm one. Always pick the cheapest option unless the user says otherwise.<|im_end|>
+    <|im_start|>user
+    Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.<|im_end|>
+    <|im_start|>assistant
+
+
+Total tokens (approx): 280
+First 40 token IDs: [27, 91, 16297, 91, 31868, 5018, 1337, 794, 330, 1723, 498, 330, 1723, 794, 5324, 609, 794, 330, 1874, 5191, 2866, 498, 330, 4789, 794, 330, 6014, 25952, 1990, 1403, 46163, 389, 264, 2728, 2457, 320, 29289, 19013, 41275, 570]
+First 40 tokens decoded individually:
+       27  '<'
+       91  '|'
+    16297  'tools'
+       91  '|'
+    31868  '>['
+     5018  '{"'
+     1337  'type'
+      794  '":'
+      330  ' "'
+     1723  'function'
+      498  '",'
+      330  ' "'
+     1723  'function'
+      794  '":'
+     5324  ' {"'
+      609  'name'
+      794  '":'
+      330  ' "'
+     1874  'search'
+     5191  '_fl'
+     2866  'ights'
+      498  '",'
+      330  ' "'
+     4789  'description'
+      794  '":'
+      330  ' "'
+     6014  'Search'
+    25952  ' flights'
+     1990  ' between'
+     1403  ' two'
+    46163  ' airports'
+      389  ' on'
+      264  ' a'
+     2728  ' given'
+     2457  ' date'
+      320  ' ('
+    29289  'YYYY'
+    19013  '-MM'
+    41275  '-DD'
+      570  ').'
+
+Takeaways:
+  * No 'messages' exist at the model layer — only this token stream.
+  * Role headers (`<|im_start|>user`) ARE tokens; the model learned
+    that pattern during training, that's how it knows whose turn it is.
+  * Tool schemas live INSIDE the prompt as text; the model generates
+    a tool call by emitting tokens that match a learned tool-call format,
+    which the SDK then parses into structured `tool_calls`.
+
+==============================================================================
+[WRAP MODEL]  ModelResponse from adapter (raw AIMessage)
+==============================================================================
+
+--- AI response message (1 messages) ---
+[0] AIMessage  name=None  tool_call_id=None
+     content: ''
+     tool_calls: [
+  {
+    "name": "search_flights",
+    "args": {
+      "origin": "JFK",
+      "destination": "LAX",
+      "date": "2026-06-01"
+    },
+    "id": "1023da27-70dd-4649-b2c5-c18c8da8a72b",
+    "type": "tool_call"
+  }
+]
+
+response_metadata:
+{
+  "model": "qwen3.5",
+  "created_at": "2026-05-12T17:19:22.4616246Z",
+  "done": true,
+  "done_reason": "stop",
+  "total_duration": 66394558000,
+  "load_duration": 9815123300,
+  "prompt_eval_count": 453,
+  "prompt_eval_duration": 20273078300,
+  "eval_count": 178,
+  "eval_duration": 36057497200,
+  "logprobs": null,
+  "model_name": "qwen3.5",
+  "model_provider": "ollama"
+}
+
+usage_metadata:
+{
+  "input_tokens": 453,
+  "output_tokens": 178,
+  "total_tokens": 631
+}
+
+==============================================================================
+[AFTER MODEL]  what the orchestrator appended to state
+==============================================================================
+
+--- newest message (1 messages) ---
+[0] AIMessage  name=None  tool_call_id=None
+     content: ''
+     tool_calls: [
+  {
+    "name": "search_flights",
+    "args": {
+      "origin": "JFK",
+      "destination": "LAX",
+      "date": "2026-06-01"
+    },
+    "id": "1023da27-70dd-4649-b2c5-c18c8da8a72b",
+    "type": "tool_call"
+  }
+]
+
+>>> Orchestrator will now run ToolNode for these tool_calls.
+
+==============================================================================
+[BEFORE MODEL]  state snapshot the orchestrator just built
+==============================================================================
+
+--- state['messages'] (3 messages) ---
+[0] HumanMessage  name=None  tool_call_id=None
+     content: 'Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.'
+[1] AIMessage  name=None  tool_call_id=None
+     content: ''
+     tool_calls: [
+  {
+    "name": "search_flights",
+    "args": {
+      "origin": "JFK",
+      "destination": "LAX",
+      "date": "2026-06-01"
+    },
+    "id": "1023da27-70dd-4649-b2c5-c18c8da8a72b",
+    "type": "tool_call"
+  }
+]
+[2] ToolMessage  name=search_flights  tool_call_id=1023da27-70dd-4649-b2c5-c18c8da8a72b
+     content: '[{"flight_id": "AA101", "carrier": "American", "depart": "08:00", "price_usd": 245}, {"flight_id": "DL202", "carrier": "Delta", "depart": "12:30", "price_usd": 198}, {"flight_id": "UA303", "carrier": ...'
+
+==============================================================================
+[WRAP MODEL]  ModelRequest that LangGraph hands to the adapter
+==============================================================================
+
+model:         output_version=None model='qwen3.5' temperature=0.0
+system_prompt: 'You are a flight booking assistant. Use `search_flights` to find options, then `book_flight` to confirm one. Always pick the cheapest option unless the user says otherwise.'
+tool_choice:   None
+#tools:        2
+
+--- request.messages (3 messages) ---
+[0] HumanMessage  name=None  tool_call_id=None
+     content: 'Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.'
+[1] AIMessage  name=None  tool_call_id=None
+     content: ''
+     tool_calls: [
+  {
+    "name": "search_flights",
+    "args": {
+      "origin": "JFK",
+      "destination": "LAX",
+      "date": "2026-06-01"
+    },
+    "id": "1023da27-70dd-4649-b2c5-c18c8da8a72b",
+    "type": "tool_call"
+  }
+]
+[2] ToolMessage  name=search_flights  tool_call_id=1023da27-70dd-4649-b2c5-c18c8da8a72b
+     content: '[{"flight_id": "AA101", "carrier": "American", "depart": "08:00", "price_usd": 245}, {"flight_id": "DL202", "carrier": "Delta", "depart": "12:30", "price_usd": 198}, {"flight_id": "UA303", "carrier": ...'
+
+------------------------------------------------------------------------------
+Tool JSON-Schemas (this is what the model is told about tools)
+------------------------------------------------------------------------------
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "search_flights",
+      "description": "Search flights between two airports on a given date (YYYY-MM-DD).",
+      "parameters": {
+        "properties": {
+          "origin": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "date"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "book_flight",
+      "description": "Book a specific flight by its flight_id for the named passenger.",
+      "parameters": {
+        "properties": {
+          "flight_id": {
+            "type": "string"
+          },
+          "passenger_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "flight_id",
+          "passenger_name"
+        ],
+        "type": "object"
+      }
+    }
+  }
+]
+
+------------------------------------------------------------------------------
+Provider HTTP payload (post-conversion, pre-tokenization)
+------------------------------------------------------------------------------
+{
+  "model": "qwen3.5",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a flight booking assistant. Use `search_flights` to find options, then `book_flight` to confirm one. Always pick the cheapest option unless the user says otherwise."
+    },
+    {
+      "content": "Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.",
+      "role": "user"
+    },
+    {
+      "content": null,
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "type": "function",
+          "id": "1023da27-70dd-4649-b2c5-c18c8da8a72b",
+          "function": {
+            "name": "search_flights",
+            "arguments": "{\"origin\": \"JFK\", \"destination\": \"LAX\", \"date\": \"2026-06-01\"}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "[{\"flight_id\": \"AA101\", \"carrier\": \"American\", \"depart\": \"08:00\", \"price_usd\": 245}, {\"flight_id\": \"DL202\", \"carrier\": \"Delta\", \"depart\": \"12:30\", \"price_usd\": 198}, {\"flight_id\": \"UA303\", \"carrier\": \"United\", \"depart\": \"18:45\", \"price_usd\": 312}]",
+      "role": "tool",
+      "tool_call_id": "1023da27-70dd-4649-b2c5-c18c8da8a72b"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "search_flights",
+        "description": "Search flights between two airports on a given date (YYYY-MM-DD).",
+        "parameters": {
+          "properties": {
+            "origin": {
+              "type": "string"
+            },
+            "destination": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "origin",
+            "destination",
+            "date"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "book_flight",
+        "description": "Book a specific flight by its flight_id for the named passenger.",
+        "parameters": {
+          "properties": {
+            "flight_id": {
+              "type": "string"
+            },
+            "passenger_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "flight_id",
+            "passenger_name"
+          ],
+          "type": "object"
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto",
+  "temperature": 0
+}
+
+------------------------------------------------------------------------------
+Tokenizer view — what the LLM literally consumes
+------------------------------------------------------------------------------
+Ollama/Qwen tokenizer not available via tiktoken; using cl100k_base as approximation.
+Rendered chat-template string (approximation):
+    <|tools|>[{"type": "function", "function": {"name": "search_flights", "description": "Search flights between two airports on a given date (YYYY-MM-DD).", "parameters": {"properties": {"origin": {"type": "string"}, "destination": {"type": "string"}, "date": {"type": "string"}}, "required": ["origin", "destination", "date"], "type": "object"}}}, {"type": "function", "function": {"name": "book_flight", "description": "Book a specific flight by its flight_id for the named passenger.", "parameters": {"properties": {"flight_id": {"type": "string"}, "passenger_name": {"type": "string"}}, "required": ["flight_id", "passenger_name"], "type": "object"}}}]<|/tools|>
+    <|im_start|>system
+    You are a flight booking assistant. Use `search_flights` to find options, then `book_flight` to confirm one. Always pick the cheapest option unless the user says otherwise.<|im_end|>
+    <|im_start|>user
+    Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.<|im_end|>
+    <|im_start|>assistant
+    <|im_end|>
+    <|tool_call|>search_flights({"origin": "JFK", "destination": "LAX", "date": "2026-06-01"})<|/tool_call|>
+    <|im_start|>tool
+    [{"flight_id": "AA101", "carrier": "American", "dep...
+
+Total tokens (approx): 440
+First 40 token IDs: [27, 91, 16297, 91, 31868, 5018, 1337, 794, 330, 1723, 498, 330, 1723, 794, 5324, 609, 794, 330, 1874, 5191, 2866, 498, 330, 4789, 794, 330, 6014, 25952, 1990, 1403, 46163, 389, 264, 2728, 2457, 320, 29289, 19013, 41275, 570]
+First 40 tokens decoded individually:
+       27  '<'
+       91  '|'
+    16297  'tools'
+       91  '|'
+    31868  '>['
+     5018  '{"'
+     1337  'type'
+      794  '":'
+      330  ' "'
+     1723  'function'
+      498  '",'
+      330  ' "'
+     1723  'function'
+      794  '":'
+     5324  ' {"'
+      609  'name'
+      794  '":'
+      330  ' "'
+     1874  'search'
+     5191  '_fl'
+     2866  'ights'
+      498  '",'
+      330  ' "'
+     4789  'description'
+      794  '":'
+      330  ' "'
+     6014  'Search'
+    25952  ' flights'
+     1990  ' between'
+     1403  ' two'
+    46163  ' airports'
+      389  ' on'
+      264  ' a'
+     2728  ' given'
+     2457  ' date'
+      320  ' ('
+    29289  'YYYY'
+    19013  '-MM'
+    41275  '-DD'
+      570  ').'
+
+Takeaways:
+  * No 'messages' exist at the model layer — only this token stream.
+  * Role headers (`<|im_start|>user`) ARE tokens; the model learned
+    that pattern during training, that's how it knows whose turn it is.
+  * Tool schemas live INSIDE the prompt as text; the model generates
+    a tool call by emitting tokens that match a learned tool-call format,
+    which the SDK then parses into structured `tool_calls`.
+
+==============================================================================
+[WRAP MODEL]  ModelResponse from adapter (raw AIMessage)
+==============================================================================
+
+--- AI response message (1 messages) ---
+[0] AIMessage  name=None  tool_call_id=None
+     content: ''
+     tool_calls: [
+  {
+    "name": "book_flight",
+    "args": {
+      "flight_id": "DL202",
+      "passenger_name": "Ada Lovelace"
+    },
+    "id": "a466a219-1828-45f5-ade5-0a33221c5744",
+    "type": "tool_call"
+  }
+]
+
+response_metadata:
+{
+  "model": "qwen3.5",
+  "created_at": "2026-05-12T17:20:22.0843803Z",
+  "done": true,
+  "done_reason": "stop",
+  "total_duration": 59544849200,
+  "load_duration": 220159200,
+  "prompt_eval_count": 640,
+  "prompt_eval_duration": 28747101700,
+  "eval_count": 146,
+  "eval_duration": 30480033400,
+  "logprobs": null,
+  "model_name": "qwen3.5",
+  "model_provider": "ollama"
+}
+
+usage_metadata:
+{
+  "input_tokens": 640,
+  "output_tokens": 146,
+  "total_tokens": 786
+}
+
+==============================================================================
+[AFTER MODEL]  what the orchestrator appended to state
+==============================================================================
+
+--- newest message (1 messages) ---
+[0] AIMessage  name=None  tool_call_id=None
+     content: ''
+     tool_calls: [
+  {
+    "name": "book_flight",
+    "args": {
+      "flight_id": "DL202",
+      "passenger_name": "Ada Lovelace"
+    },
+    "id": "a466a219-1828-45f5-ade5-0a33221c5744",
+    "type": "tool_call"
+  }
+]
+
+>>> Orchestrator will now run ToolNode for these tool_calls.
+
+==============================================================================
+[BEFORE MODEL]  state snapshot the orchestrator just built
+==============================================================================
+
+--- state['messages'] (5 messages) ---
+[0] HumanMessage  name=None  tool_call_id=None
+     content: 'Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.'
+[1] AIMessage  name=None  tool_call_id=None
+     content: ''
+     tool_calls: [
+  {
+    "name": "search_flights",
+    "args": {
+      "origin": "JFK",
+      "destination": "LAX",
+      "date": "2026-06-01"
+    },
+    "id": "1023da27-70dd-4649-b2c5-c18c8da8a72b",
+    "type": "tool_call"
+  }
+]
+[2] ToolMessage  name=search_flights  tool_call_id=1023da27-70dd-4649-b2c5-c18c8da8a72b
+     content: '[{"flight_id": "AA101", "carrier": "American", "depart": "08:00", "price_usd": 245}, {"flight_id": "DL202", "carrier": "Delta", "depart": "12:30", "price_usd": 198}, {"flight_id": "UA303", "carrier": ...'
+[3] AIMessage  name=None  tool_call_id=None
+     content: ''
+     tool_calls: [
+  {
+    "name": "book_flight",
+    "args": {
+      "flight_id": "DL202",
+      "passenger_name": "Ada Lovelace"
+    },
+    "id": "a466a219-1828-45f5-ade5-0a33221c5744",
+    "type": "tool_call"
+  }
+]
+[4] ToolMessage  name=book_flight  tool_call_id=a466a219-1828-45f5-ade5-0a33221c5744
+     content: '{"confirmation": "CONF-DL202-AdaLovelace", "status": "BOOKED"}'
+
+==============================================================================
+[WRAP MODEL]  ModelRequest that LangGraph hands to the adapter
+==============================================================================
+
+model:         output_version=None model='qwen3.5' temperature=0.0
+system_prompt: 'You are a flight booking assistant. Use `search_flights` to find options, then `book_flight` to confirm one. Always pick the cheapest option unless the user says otherwise.'
+tool_choice:   None
+#tools:        2
+
+--- request.messages (5 messages) ---
+[0] HumanMessage  name=None  tool_call_id=None
+     content: 'Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.'
+[1] AIMessage  name=None  tool_call_id=None
+     content: ''
+     tool_calls: [
+  {
+    "name": "search_flights",
+    "args": {
+      "origin": "JFK",
+      "destination": "LAX",
+      "date": "2026-06-01"
+    },
+    "id": "1023da27-70dd-4649-b2c5-c18c8da8a72b",
+    "type": "tool_call"
+  }
+]
+[2] ToolMessage  name=search_flights  tool_call_id=1023da27-70dd-4649-b2c5-c18c8da8a72b
+     content: '[{"flight_id": "AA101", "carrier": "American", "depart": "08:00", "price_usd": 245}, {"flight_id": "DL202", "carrier": "Delta", "depart": "12:30", "price_usd": 198}, {"flight_id": "UA303", "carrier": ...'
+[3] AIMessage  name=None  tool_call_id=None
+     content: ''
+     tool_calls: [
+  {
+    "name": "book_flight",
+    "args": {
+      "flight_id": "DL202",
+      "passenger_name": "Ada Lovelace"
+    },
+    "id": "a466a219-1828-45f5-ade5-0a33221c5744",
+    "type": "tool_call"
+  }
+]
+[4] ToolMessage  name=book_flight  tool_call_id=a466a219-1828-45f5-ade5-0a33221c5744
+     content: '{"confirmation": "CONF-DL202-AdaLovelace", "status": "BOOKED"}'
+
+------------------------------------------------------------------------------
+Tool JSON-Schemas (this is what the model is told about tools)
+------------------------------------------------------------------------------
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "search_flights",
+      "description": "Search flights between two airports on a given date (YYYY-MM-DD).",
+      "parameters": {
+        "properties": {
+          "origin": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "origin",
+          "destination",
+          "date"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "book_flight",
+      "description": "Book a specific flight by its flight_id for the named passenger.",
+      "parameters": {
+        "properties": {
+          "flight_id": {
+            "type": "string"
+          },
+          "passenger_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "flight_id",
+          "passenger_name"
+        ],
+        "type": "object"
+      }
+    }
+  }
+]
+
+------------------------------------------------------------------------------
+Provider HTTP payload (post-conversion, pre-tokenization)
+------------------------------------------------------------------------------
+{
+  "model": "qwen3.5",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a flight booking assistant. Use `search_flights` to find options, then `book_flight` to confirm one. Always pick the cheapest option unless the user says otherwise."
+    },
+    {
+      "content": "Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.",
+      "role": "user"
+    },
+    {
+      "content": null,
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "type": "function",
+          "id": "1023da27-70dd-4649-b2c5-c18c8da8a72b",
+          "function": {
+            "name": "search_flights",
+            "arguments": "{\"origin\": \"JFK\", \"destination\": \"LAX\", \"date\": \"2026-06-01\"}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "[{\"flight_id\": \"AA101\", \"carrier\": \"American\", \"depart\": \"08:00\", \"price_usd\": 245}, {\"flight_id\": \"DL202\", \"carrier\": \"Delta\", \"depart\": \"12:30\", \"price_usd\": 198}, {\"flight_id\": \"UA303\", \"carrier\": \"United\", \"depart\": \"18:45\", \"price_usd\": 312}]",
+      "role": "tool",
+      "tool_call_id": "1023da27-70dd-4649-b2c5-c18c8da8a72b"
+    },
+    {
+      "content": null,
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "type": "function",
+          "id": "a466a219-1828-45f5-ade5-0a33221c5744",
+          "function": {
+            "name": "book_flight",
+            "arguments": "{\"flight_id\": \"DL202\", \"passenger_name\": \"Ada Lovelace\"}"
+          }
+        }
+      ]
+    },
+    {
+      "content": "{\"confirmation\": \"CONF-DL202-AdaLovelace\", \"status\": \"BOOKED\"}",
+      "role": "tool",
+      "tool_call_id": "a466a219-1828-45f5-ade5-0a33221c5744"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "search_flights",
+        "description": "Search flights between two airports on a given date (YYYY-MM-DD).",
+        "parameters": {
+          "properties": {
+            "origin": {
+              "type": "string"
+            },
+            "destination": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "origin",
+            "destination",
+            "date"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "book_flight",
+        "description": "Book a specific flight by its flight_id for the named passenger.",
+        "parameters": {
+          "properties": {
+            "flight_id": {
+              "type": "string"
+            },
+            "passenger_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "flight_id",
+            "passenger_name"
+          ],
+          "type": "object"
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto",
+  "temperature": 0
+}
+
+------------------------------------------------------------------------------
+Tokenizer view — what the LLM literally consumes
+------------------------------------------------------------------------------
+Ollama/Qwen tokenizer not available via tiktoken; using cl100k_base as approximation.
+Rendered chat-template string (approximation):
+    <|tools|>[{"type": "function", "function": {"name": "search_flights", "description": "Search flights between two airports on a given date (YYYY-MM-DD).", "parameters": {"properties": {"origin": {"type": "string"}, "destination": {"type": "string"}, "date": {"type": "string"}}, "required": ["origin", "destination", "date"], "type": "object"}}}, {"type": "function", "function": {"name": "book_flight", "description": "Book a specific flight by its flight_id for the named passenger.", "parameters": {"properties": {"flight_id": {"type": "string"}, "passenger_name": {"type": "string"}}, "required": ["flight_id", "passenger_name"], "type": "object"}}}]<|/tools|>
+    <|im_start|>system
+    You are a flight booking assistant. Use `search_flights` to find options, then `book_flight` to confirm one. Always pick the cheapest option unless the user says otherwise.<|im_end|>
+    <|im_start|>user
+    Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.<|im_end|>
+    <|im_start|>assistant
+    <|im_end|>
+    <|tool_call|>search_flights({"origin": "JFK", "destination": "LAX", "date": "2026-06-01"})<|/tool_call|>
+    <|im_start|>tool
+    [{"flight_id": "AA101", "carrier": "American", "dep...
+
+Total tokens (approx): 523
+First 40 token IDs: [27, 91, 16297, 91, 31868, 5018, 1337, 794, 330, 1723, 498, 330, 1723, 794, 5324, 609, 794, 330, 1874, 5191, 2866, 498, 330, 4789, 794, 330, 6014, 25952, 1990, 1403, 46163, 389, 264, 2728, 2457, 320, 29289, 19013, 41275, 570]
+First 40 tokens decoded individually:
+       27  '<'
+       91  '|'
+    16297  'tools'
+       91  '|'
+    31868  '>['
+     5018  '{"'
+     1337  'type'
+      794  '":'
+      330  ' "'
+     1723  'function'
+      498  '",'
+      330  ' "'
+     1723  'function'
+      794  '":'
+     5324  ' {"'
+      609  'name'
+      794  '":'
+      330  ' "'
+     1874  'search'
+     5191  '_fl'
+     2866  'ights'
+      498  '",'
+      330  ' "'
+     4789  'description'
+      794  '":'
+      330  ' "'
+     6014  'Search'
+    25952  ' flights'
+     1990  ' between'
+     1403  ' two'
+    46163  ' airports'
+      389  ' on'
+      264  ' a'
+     2728  ' given'
+     2457  ' date'
+      320  ' ('
+    29289  'YYYY'
+    19013  '-MM'
+    41275  '-DD'
+      570  ').'
+
+Takeaways:
+  * No 'messages' exist at the model layer — only this token stream.
+  * Role headers (`<|im_start|>user`) ARE tokens; the model learned
+    that pattern during training, that's how it knows whose turn it is.
+  * Tool schemas live INSIDE the prompt as text; the model generates
+    a tool call by emitting tokens that match a learned tool-call format,
+    which the SDK then parses into structured `tool_calls`.
+
+==============================================================================
+[WRAP MODEL]  ModelResponse from adapter (raw AIMessage)
+==============================================================================
+
+--- AI response message (1 messages) ---
+[0] AIMessage  name=None  tool_call_id=None
+     content: 'I have found and booked the cheapest flight from JFK to LAX on June 1, 2026, for Ada Lovelace.\n\nThe selected flight is:\n*   **Flight ID:** DL202\n*   **Carrier:** Delta\n*   **Departure Time:** 12:30\n* ...'
+
+response_metadata:
+{
+  "model": "qwen3.5",
+  "created_at": "2026-05-12T17:20:55.7338799Z",
+  "done": true,
+  "done_reason": "stop",
+  "total_duration": 33627072300,
+  "load_duration": 251212400,
+  "prompt_eval_count": 728,
+  "prompt_eval_duration": 11021081300,
+  "eval_count": 100,
+  "eval_duration": 22277345100,
+  "logprobs": null,
+  "model_name": "qwen3.5",
+  "model_provider": "ollama"
+}
+
+usage_metadata:
+{
+  "input_tokens": 728,
+  "output_tokens": 100,
+  "total_tokens": 828
+}
+
+==============================================================================
+[AFTER MODEL]  what the orchestrator appended to state
+==============================================================================
+
+--- newest message (1 messages) ---
+[0] AIMessage  name=None  tool_call_id=None
+     content: 'I have found and booked the cheapest flight from JFK to LAX on June 1, 2026, for Ada Lovelace.\n\nThe selected flight is:\n*   **Flight ID:** DL202\n*   **Carrier:** Delta\n*   **Departure Time:** 12:30\n* ...'
+
+>>> No tool_calls — loop will terminate after this turn.
+
+##############################################################################
+FINAL STATE — full message log
+##############################################################################
+
+--- result['messages'] (6 messages) ---
+[0] HumanMessage  name=None  tool_call_id=None
+     content: 'Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.'
+[1] AIMessage  name=None  tool_call_id=None
+     content: ''
+     tool_calls: [
+  {
+    "name": "search_flights",
+    "args": {
+      "origin": "JFK",
+      "destination": "LAX",
+      "date": "2026-06-01"
+    },
+    "id": "1023da27-70dd-4649-b2c5-c18c8da8a72b",
+    "type": "tool_call"
+  }
+]
+[2] ToolMessage  name=search_flights  tool_call_id=1023da27-70dd-4649-b2c5-c18c8da8a72b
+     content: '[{"flight_id": "AA101", "carrier": "American", "depart": "08:00", "price_usd": 245}, {"flight_id": "DL202", "carrier": "Delta", "depart": "12:30", "price_usd": 198}, {"flight_id": "UA303", "carrier": ...'
+[3] AIMessage  name=None  tool_call_id=None
+     content: ''
+     tool_calls: [
+  {
+    "name": "book_flight",
+    "args": {
+      "flight_id": "DL202",
+      "passenger_name": "Ada Lovelace"
+    },
+    "id": "a466a219-1828-45f5-ade5-0a33221c5744",
+    "type": "tool_call"
+  }
+]
+[4] ToolMessage  name=book_flight  tool_call_id=a466a219-1828-45f5-ade5-0a33221c5744
+     content: '{"confirmation": "CONF-DL202-AdaLovelace", "status": "BOOKED"}'
+[5] AIMessage  name=None  tool_call_id=None
+     content: 'I have found and booked the cheapest flight from JFK to LAX on June 1, 2026, for Ada Lovelace.\n\nThe selected flight is:\n*   **Flight ID:** DL202\n*   **Carrier:** Delta\n*   **Departure Time:** 12:30\n* ...'
+
+##############################################################################
+FINAL ASSISTANT REPLY
+##############################################################################
+I have found and booked the cheapest flight from JFK to LAX on June 1, 2026, for Ada Lovelace.
+
+The selected flight is:
+*   **Flight ID:** DL202
+*   **Carrier:** Delta
+*   **Departure Time:** 12:30
+*   **Price:** $198
+
+Your booking confirmation number is **CONF-DL202-AdaLovelace**.
