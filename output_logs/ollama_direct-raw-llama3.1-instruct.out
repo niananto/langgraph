@@ -1,0 +1,17 @@
+
+######################################################################
+RAW MODE — single /api/generate call, no tool parsing
+######################################################################
+
+======================================================================
+RAW PROMPT  ->  POST /api/generate  (manually rendered chat template)
+======================================================================
+<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+[TOOLS][{"type": "function", "function": {"name": "search_flights", "description": "Search flights between two airports on a given date (YYYY-MM-DD).", "parameters": {"type": "object", "properties": {"origin": {"type": "string"}, "destination": {"type": "string"}, "date": {"type": "string"}}, "required": ["origin", "destination", "date"]}}}, {"type": "function", "function": {"name": "book_flight", "description": "Book a specific flight by its flight_id for the named passenger.", "parameters": {"type": "object", "properties": {"flight_id": {"type": "string"}, "passenger_name": {"type": "string"}}, "required": ["flight_id", "passenger_name"]}}}][/TOOLS]<|eot_id|><|start_header_id|>system<|end_header_id|>
+
+You are a flight booking assistant. IMPORTANT: call search_flights FIRST and wait for the results. Only after you have the search results should you call book_flight with the actual flight_id from those results. Always pick the cheapest option unless the user says otherwise.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+

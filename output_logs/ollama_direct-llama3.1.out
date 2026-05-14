@@ -1,0 +1,145 @@
+
+######################################################################
+TURN 1
+######################################################################
+
+======================================================================
+REQUEST  ->  POST /api/chat
+======================================================================
+{
+  "model": "llama3.1:8b",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a flight booking assistant. IMPORTANT: call search_flights FIRST and wait for the results. Only after you have the search results should you call book_flight with the actual flight_id from those results. Always pick the cheapest option unless the user says otherwise."
+    },
+    {
+      "role": "user",
+      "content": "Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace."
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "search_flights",
+        "description": "Search flights between two airports on a given date (YYYY-MM-DD).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "origin": {
+              "type": "string"
+            },
+            "destination": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "origin",
+            "destination",
+            "date"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "book_flight",
+        "description": "Book a specific flight by its flight_id for the named passenger.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "flight_id": {
+              "type": "string"
+            },
+            "passenger_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "flight_id",
+            "passenger_name"
+          ]
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto",
+  "temperature": 0,
+  "stream": false
+}
+
+======================================================================
+RAW RESPONSE  <-  Ollama
+======================================================================
+{
+  "model": "llama3.1:8b",
+  "created_at": "2026-05-14T12:25:11.6024197Z",
+  "message": {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_jq3fru3d",
+        "function": {
+          "index": 0,
+          "name": "search_flights",
+          "arguments": {
+            "origin": "JFK",
+            "destination": "LAX",
+            "date": "2024-06-01"
+          }
+        }
+      },
+      {
+        "id": "call_ujoeti1k",
+        "function": {
+          "index": 1,
+          "name": "book_flight",
+          "arguments": {
+            "passenger_name": "Ada Lovelace"
+          }
+        }
+      },
+      {
+        "id": "call_jupcspum",
+        "function": {
+          "index": 2,
+          "name": "search_flights",
+          "arguments": {
+            "origin": "JFK",
+            "destination": "LAX",
+            "date": "2026-06-01"
+          }
+        }
+      },
+      {
+        "id": "call_3clkl1c4",
+        "function": {
+          "index": 3,
+          "name": "book_flight",
+          "arguments": {
+            "passenger_name": "Ada Lovelace"
+          }
+        }
+      }
+    ]
+  },
+  "done": true,
+  "done_reason": "stop",
+  "total_duration": 39762500400,
+  "load_duration": 7815584900,
+  "prompt_eval_count": 301,
+  "prompt_eval_duration": 12900030400,
+  "eval_count": 150,
+  "eval_duration": 18903529000
+}
+
+>>> TOOL CALL: search_flights({"origin": "JFK", "destination": "LAX", "date": "2024-06-01"})
+    RESULT:    [{"flight_id": "AA101", "carrier": "American", "depart": "08:00", "price_usd": 245}, {"flight_id": "DL202", "carrier": "Delta", "depart": "12:30", "price_usd": 198}, {"flight_id": "UA303", "carrier": "United", "depart": "18:45", "price_usd": 312}]
+
+>>> TOOL CALL: book_flight({"passenger_name": "Ada Lovelace"})

@@ -9,7 +9,7 @@ The request JSON structure mirrors what middleware_deep_dive.py logs as
 "Provider HTTP payload (post-conversion, pre-tokenization)".
 
 Run:
-    ollama serve          # make sure llama3.1:8b is pulled
+    ollama serve          # make sure llama3.1:8b-instruct-q8_0 is pulled
     python ollama_direct.py          # full agentic loop via /api/chat
     python ollama_direct.py --raw    # single shot via /api/generate, no parsing
 """
@@ -26,7 +26,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 OLLAMA_BASE = "http://localhost:11434"
-MODEL = "llama3.1:8b"
+MODEL = "llama3.1:8b-instruct-q8_0"
 
 # ---------------------------------------------------------------------------
 # Tool implementations
@@ -99,7 +99,7 @@ def ollama_chat(messages: list[dict], tools: list[dict] | None = None) -> dict:
 
     Ollama response shape:
     {
-      "model": "llama3.1:8b",
+      "model": "llama3.1:8b-instruct-q8_0",
       "message": {
         "role": "assistant",
         "content": "",                  # empty when tool_calls are present
