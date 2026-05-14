@@ -8,3 +8,6 @@ tiktoken
 transformers
 requests
 debugpy
+numpy
+safetensors
+huggingface_hub
