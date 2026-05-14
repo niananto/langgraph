@@ -10,7 +10,8 @@ The request JSON structure mirrors what middleware_deep_dive.py logs as
 
 Run:
     ollama serve          # make sure llama3.1:8b is pulled
-    python ollama_direct.py
+    python ollama_direct.py          # full agentic loop via /api/chat
+    python ollama_direct.py --raw    # single shot via /api/generate, no parsing
 """
 
 from __future__ import annotations
@@ -104,11 +105,11 @@ def ollama_chat(messages: list[dict], tools: list[dict] | None = None) -> dict:
         "content": "",                  # empty when tool_calls are present
         "tool_calls": [                 # only present when model wants to call a tool
           {
+            "id": "call_oz7y4epv",     # Ollama >= 0.23 includes this
             "function": {
               "name": "search_flights",
               "arguments": {"origin": "JFK", "destination": "LAX", "date": "..."}
             }
-            # NOTE: Ollama does NOT include an id field here — we generate our own
           }
         ]
       },
@@ -146,14 +147,90 @@ def ollama_chat(messages: list[dict], tools: list[dict] | None = None) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Raw generation — bypasses /api/chat tool parsing entirely
+# ---------------------------------------------------------------------------
+def render_llama_prompt(messages: list[dict], tools: list[dict]) -> str:
+    """Render the LLaMA 3.1 chat template manually, the same way Ollama does
+    internally before feeding it to the model.
+
+    This is the exact string the model tokenizes and runs on. Tool schemas are
+    injected as plain JSON text inside a [TOOLS]...[/TOOLS] system block —
+    which is why the model can 'see' tools at all; it's just text tokens.
+    """
+    parts = ["<|begin_of_text|>"]
+
+    # inject tools as a system block before the first message
+    if tools:
+        tool_json = json.dumps(tools)
+        parts.append(
+            f"<|start_header_id|>system<|end_header_id|>\n\n"
+            f"[TOOLS]{tool_json}[/TOOLS]<|eot_id|>"
+        )
+
+    for m in messages:
+        role = m["role"]
+        content = m.get("content") or ""
+        parts.append(
+            f"<|start_header_id|>{role}<|end_header_id|>\n\n{content}<|eot_id|>"
+        )
+
+    # leave the assistant header open so the model completes from here
+    parts.append("<|start_header_id|>assistant<|end_header_id|>\n\n")
+    return "".join(parts)
+
+
+def ollama_generate_raw(messages: list[dict], tools: list[dict]) -> str:
+    """POST to /api/generate with a manually rendered prompt.
+
+    Unlike /api/chat, this endpoint does NO tool-call parsing — you get back
+    the raw text tokens the model emitted. For LLaMA 3.1 a tool call looks
+    something like:
+
+        <|python_tag|>{"name": "search_flights", "parameters": {...}}
+
+    or in newer fine-tunes, a plain JSON blob. Ollama's /api/chat detects
+    this pattern and converts it into the structured tool_calls field you
+    normally see — this function lets you observe the text before that step.
+    """
+    prompt = render_llama_prompt(messages, tools)
+
+    payload = {
+        "model": MODEL,
+        "prompt": prompt,
+        "raw": True,        # skip Ollama's own template rendering — we did it
+        "stream": False,
+        "temperature": 0,
+    }
+
+    print("\n" + "=" * 70)
+    print("RAW PROMPT  ->  POST /api/generate  (manually rendered chat template)")
+    print("=" * 70)
+    print(prompt)
+
+    resp = requests.post(f"{OLLAMA_BASE}/api/generate", json=payload, timeout=120)
+    resp.raise_for_status()
+    result = resp.json()
+
+    raw_text = result.get("response", "")
+    print("\n" + "=" * 70)
+    print("RAW MODEL OUTPUT  <-  /api/generate  (unparsed token text)")
+    print("=" * 70)
+    print(repr(raw_text))
+    print("\n(plain view):")
+    print(raw_text)
+
+    return raw_text
+
+
+# ---------------------------------------------------------------------------
 # Parse tool_calls out of the raw Ollama response
 # ---------------------------------------------------------------------------
 def parse_tool_calls(raw: dict) -> list[dict]:
-    """Extract tool calls from the raw Ollama response.
+    """Extract tool calls from the raw Ollama /api/chat response.
 
-    Ollama doesn't provide IDs on tool_calls, so we generate UUIDs here.
-    These IDs must be echoed back in the tool result messages so the model
-    can correlate results with the calls it made.
+    Newer Ollama versions include an id field on each tool call; older ones
+    don't. We fall back to generating a UUID when the id is absent so the
+    tool result messages always have a matching tool_call_id.
 
     Returns list of:
         {"id": str, "name": str, "args": dict}
@@ -167,7 +244,7 @@ def parse_tool_calls(raw: dict) -> list[dict]:
         if isinstance(args, str):
             args = json.loads(args)
         parsed.append({
-            "id":   str(uuid.uuid4()),
+            "id":   tc.get("id") or str(uuid.uuid4()),  # Ollama >= 0.23 includes id
             "name": fn["name"],
             "args": args,
         })
@@ -191,7 +268,7 @@ def execute_tools(tool_calls: list[dict]) -> list[dict]:
     for tc in tool_calls:
         fn = TOOL_REGISTRY.get(tc["name"])
         if fn is None:
-            content = json.dumps({"error": f"unknown tool '{tc['name']}'" })
+            content = json.dumps({"error": f"unknown tool '{tc['name']}'"})
         else:
             print(f"\n>>> TOOL CALL: {tc['name']}({json.dumps(tc['args'])})")
             content = fn(**tc["args"])
@@ -209,6 +286,11 @@ def execute_tools(tool_calls: list[dict]) -> list[dict]:
 # Agent loop
 # ---------------------------------------------------------------------------
 def main() -> None:
+    # Pass --raw to see the unparsed model output via /api/generate instead
+    # of the structured tool_calls returned by /api/chat.
+    # Usage:  python ollama_direct.py --raw
+    raw_mode = "--raw" in sys.argv
+
     messages: list[dict] = [
         {
             "role": "system",
@@ -228,6 +310,16 @@ def main() -> None:
             ),
         },
     ]
+
+    if raw_mode:
+        # --raw: render the chat template manually and hit /api/generate.
+        # Shows the exact text the model emits before Ollama parses tool calls.
+        # Does NOT run the agentic loop — it's a single shot to see raw output.
+        print(f"\n{'#' * 70}")
+        print("RAW MODE — single /api/generate call, no tool parsing")
+        print(f"{'#' * 70}")
+        ollama_generate_raw(messages, TOOLS)
+        return
 
     turn = 1
     while True:
