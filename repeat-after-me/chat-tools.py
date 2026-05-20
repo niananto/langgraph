@@ -45,11 +45,11 @@ SEP = "-" * 60
 def search_tables(query: str, max_budget: int | None = None) -> str:
     """Search online for tables matching a query and budget."""
     results = [
-        {"id": "T1", "name": "Oak Dining Table",   "price_usd": 320, "comfort": "medium"},
-        {"id": "T2", "name": "Ergonomic Work Table","price_usd": 450, "comfort": "high"},
+        {"id": "T1", "name": "Oak Dining Table",    "price_usd": 320, "comfort": "medium"},
+        {"id": "T2", "name": "Ergonomic Work Table", "price_usd": 450, "comfort": "high"},
         {"id": "T3", "name": "Folding Picnic Table", "price_usd": 89,  "comfort": "low"},
     ]
-    if max_budget is not None:
+    if isinstance(max_budget, int):
         results = [r for r in results if r["price_usd"] <= max_budget]
     return json.dumps(results)
 
@@ -57,11 +57,11 @@ def search_tables(query: str, max_budget: int | None = None) -> str:
 def find_desks(query: str, max_budget: int | None = None) -> str:
     """Find desks online matching a query and budget."""
     results = [
-        {"id": "D1", "name": "Standing Desk Pro",  "price_usd": 599, "comfort": "very high"},
-        {"id": "D2", "name": "L-shaped Corner Desk","price_usd": 275, "comfort": "high"},
-        {"id": "D3", "name": "Basic Writing Desk",  "price_usd": 120, "comfort": "medium"},
+        {"id": "D1", "name": "Standing Desk Pro",   "price_usd": 599, "comfort": "very high"},
+        {"id": "D2", "name": "L-shaped Corner Desk", "price_usd": 275, "comfort": "high"},
+        {"id": "D3", "name": "Basic Writing Desk",   "price_usd": 120, "comfort": "medium"},
     ]
-    if max_budget is not None:
+    if isinstance(max_budget, int):
         results = [r for r in results if r["price_usd"] <= max_budget]
     return json.dumps(results)
 
@@ -144,18 +144,16 @@ graph = (
 # ---------------------------------------------------------------------------
 # REPL
 # ---------------------------------------------------------------------------
-SYSTEM_PROMPT = (
-    "You are a furniture shopping assistant. "
-    "Use search_tables to find tables and find_desks to find desks. "
-    "When the user wants both, call both tools."
-)
+SYSTEM_PROMPT = "You are a helpful furniture shopping assistant."
 
 
 def main() -> None:
     print(f"Chat with {MODEL} + tools (LangGraph). Ctrl-C or Ctrl-D to quit.")
     print(f"Tools available: {', '.join(TOOL_REGISTRY)}\n")
 
-    history: list = [{"role": "system", "content": SYSTEM_PROMPT}]
+    # system message is injected once; history accumulates only human/ai/tool turns
+    system_msg = {"role": "system", "content": SYSTEM_PROMPT}
+    history: list = []
 
     while True:
         try:
@@ -168,10 +166,10 @@ def main() -> None:
             continue
 
         history.append({"role": "user", "content": user_input})
-        result = graph.invoke({"messages": history})
-        history = result["messages"]
+        result = graph.invoke({"messages": [system_msg] + history})
+        # keep only the new messages appended this turn (everything after system+prior history)
+        history = list(result["messages"][1:])
 
-        # last message is the final text reply from the model
         final = history[-1]
         print(f"\nAssistant: {final.content}\n")
 
