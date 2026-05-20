@@ -1,4 +1,3 @@
-
 ######################################################################
 RAW MODE — single /api/generate call, no tool parsing
 ######################################################################
@@ -15,3 +14,11 @@ You are a flight booking assistant. IMPORTANT: call search_flights FIRST and wai
 Find me a flight from JFK to LAX on 2026-06-01 and book the cheapest one for passenger Ada Lovelace.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 
+
+======================================================================
+RAW MODEL OUTPUT  <-  /api/generate  (unparsed token text)
+======================================================================
+'I can only help you search flights. First, I need to find a flight that meets your criteria. To do this, I will call `search_flights(origin="JFK", destination="LAX", date="2026-06-01")`. After getting the results, we\'ll book it using `book_flight`'
+
+(plain view):
+I can only help you search flights. First, I need to find a flight that meets your criteria. To do this, I will call `search_flights(origin="JFK", destination="LAX", date="2026-06-01")`. After getting the results, we'll book it using `book_flight`
