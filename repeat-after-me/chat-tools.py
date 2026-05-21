@@ -96,10 +96,26 @@ def call_model(state: State) -> State:
     return {"messages": [response]}
 
 
+_tool_node = ToolNode(TOOLS)
+
+
+def run_tools(state: State) -> State:
+    last = state["messages"][-1]
+    for tc in last.tool_calls:
+        print(f"[TOOL CALL]   {tc['name']}({tc['args']})")
+
+    result = _tool_node.invoke(state)
+
+    for msg in result["messages"]:
+        print(f"[TOOL RESULT] {msg.content}")
+
+    return result
+
+
 graph = (
     StateGraph(State)
     .add_node("model", call_model)
-    .add_node("tools", ToolNode(TOOLS))
+    .add_node("tools", run_tools)
     .add_edge(START, "model")
     .add_conditional_edges("model", tools_condition)
     .add_edge("tools", "model")
