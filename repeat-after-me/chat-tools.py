@@ -42,8 +42,8 @@ SEP = "-" * 60
 # ---------------------------------------------------------------------------
 # Tool implementations
 # ---------------------------------------------------------------------------
-def search_tables(query: str, max_budget: int | None = None) -> str:
-    """Search online for tables matching a query and budget."""
+def search_tables(max_budget: int) -> str:
+    """Search online for tables matching a budget."""
     results = [
         {"id": "T1", "name": "Oak Dining Table",    "price_usd": 320, "comfort": "medium"},
         {"id": "T2", "name": "Ergonomic Work Table", "price_usd": 450, "comfort": "high"},
@@ -54,8 +54,8 @@ def search_tables(query: str, max_budget: int | None = None) -> str:
     return json.dumps(results)
 
 
-def find_desks(query: str, max_budget: int | None = None) -> str:
-    """Find desks online matching a query and budget."""
+def find_desks(max_budget: int) -> str:
+    """Find desks online matching a budget."""
     results = [
         {"id": "D1", "name": "Standing Desk Pro",   "price_usd": 599, "comfort": "very high"},
         {"id": "D2", "name": "L-shaped Corner Desk", "price_usd": 275, "comfort": "high"},
@@ -144,7 +144,7 @@ graph = (
 # ---------------------------------------------------------------------------
 # REPL
 # ---------------------------------------------------------------------------
-SYSTEM_PROMPT = "You are a helpful furniture shopping assistant."
+SYSTEM_PROMPT = "You are a helpful assistant, who repeats what the user says inside quotation marks. Nothing more, nothing less"
 
 
 def main() -> None:
