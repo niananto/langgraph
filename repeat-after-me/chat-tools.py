@@ -1,15 +1,13 @@
 """
 chat-tools.py — CLI chat with tool calling via LangGraph + Ollama (llama3.1:8b).
 
-Tools are bound at graph construction time, not per-message.  The schemas are
-serialised into every prompt regardless, so binding once keeps the graph's
-behaviour fixed and avoids re-specifying them on each call — same pattern
-LangGraph's create_react_agent uses internally.
+Tools are bound at graph construction time via bind_tools().  LangGraph's
+ToolNode and tools_condition handle all tool dispatch and loop routing —
+no manual registry, no custom should_continue, no ToolMessage construction.
 
-Each assistant turn prints two blocks:
+Each assistant turn prints:
   [RAW]    — AIMessage.content (the text tokens the model emitted)
-  [PARSED] — AIMessage.tool_calls (structured list after langchain_ollama
-              parses the <|python_tag|> blob)
+  [PARSED] — AIMessage.tool_calls (structured list parsed by langchain_ollama)
 
 Run:
     python chat-tools.py
@@ -22,10 +20,10 @@ import json
 import sys
 from typing import Annotated
 
-from langchain_core.messages import AIMessage, ToolMessage
 from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode, tools_condition
 from typing_extensions import TypedDict
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -57,7 +55,7 @@ def search_tables(max_budget: int) -> str:
 def find_desks(max_budget: int) -> str:
     """Find desks online matching a budget."""
     results = [
-        {"id": "D1", "name": "Standing Desk Pro",   "price_usd": 599, "comfort": "very high"},
+        {"id": "D1", "name": "Standing Desk Pro",    "price_usd": 599, "comfort": "very high"},
         {"id": "D2", "name": "L-shaped Corner Desk", "price_usd": 275, "comfort": "high"},
         {"id": "D3", "name": "Basic Writing Desk",   "price_usd": 120, "comfort": "medium"},
     ]
@@ -65,11 +63,6 @@ def find_desks(max_budget: int) -> str:
         results = [r for r in results if r["price_usd"] <= max_budget]
     return json.dumps(results)
 
-
-TOOL_REGISTRY = {
-    "search_tables": search_tables,
-    "find_desks":    find_desks,
-}
 
 TOOLS = [search_tables, find_desks]
 
@@ -82,7 +75,7 @@ class State(TypedDict):
 
 
 # ---------------------------------------------------------------------------
-# Graph nodes
+# Graph
 # ---------------------------------------------------------------------------
 llm = ChatOllama(model=MODEL, temperature=0).bind_tools(TOOLS)
 
@@ -90,11 +83,10 @@ llm = ChatOllama(model=MODEL, temperature=0).bind_tools(TOOLS)
 def call_model(state: State) -> State:
     response = llm.invoke(state["messages"])
 
-    # ── show raw + parsed output ──────────────────────────────────────────
     print(f"\n{SEP}")
     print(f"[RAW]    content = {repr(response.content)}")
     if response.tool_calls:
-        print(f"[PARSED] tool_calls =")
+        print("[PARSED] tool_calls =")
         for tc in response.tool_calls:
             print(f"           name={tc['name']!r}  args={tc['args']}")
     else:
@@ -104,38 +96,12 @@ def call_model(state: State) -> State:
     return {"messages": [response]}
 
 
-def run_tools(state: State) -> State:
-    last: AIMessage = state["messages"][-1]
-    tool_messages = []
-    for tc in last.tool_calls:
-        fn = TOOL_REGISTRY.get(tc["name"])
-        if fn is None:
-            result = json.dumps({"error": f"unknown tool '{tc['name']}'"})
-        else:
-            result = fn(**tc["args"])
-        print(f"[TOOL]   {tc['name']}({tc['args']}) -> {result}")
-        tool_messages.append(
-            ToolMessage(content=result, tool_call_id=tc["id"])
-        )
-    return {"messages": tool_messages}
-
-
-def should_continue(state: State) -> str:
-    last = state["messages"][-1]
-    if isinstance(last, AIMessage) and last.tool_calls:
-        return "tools"
-    return END
-
-
-# ---------------------------------------------------------------------------
-# Graph
-# ---------------------------------------------------------------------------
 graph = (
     StateGraph(State)
     .add_node("model", call_model)
-    .add_node("tools", run_tools)
+    .add_node("tools", ToolNode(TOOLS))
     .add_edge(START, "model")
-    .add_conditional_edges("model", should_continue, {"tools": "tools", END: END})
+    .add_conditional_edges("model", tools_condition)
     .add_edge("tools", "model")
     .compile()
 )
@@ -149,9 +115,8 @@ SYSTEM_PROMPT = "You are a helpful assistant, who repeats what the user says ins
 
 def main() -> None:
     print(f"Chat with {MODEL} + tools (LangGraph). Ctrl-C or Ctrl-D to quit.")
-    print(f"Tools available: {', '.join(TOOL_REGISTRY)}\n")
+    print(f"Tools available: {', '.join(t.__name__ for t in TOOLS)}\n")
 
-    # system message is injected once; history accumulates only human/ai/tool turns
     system_msg = {"role": "system", "content": SYSTEM_PROMPT}
     history: list = []
 
@@ -167,11 +132,9 @@ def main() -> None:
 
         history.append({"role": "user", "content": user_input})
         result = graph.invoke({"messages": [system_msg] + history})
-        # keep only the new messages appended this turn (everything after system+prior history)
         history = list(result["messages"][1:])
 
-        final = history[-1]
-        print(f"\nAssistant: {final.content}\n")
+        print(f"\nAssistant: {history[-1].content}\n")
 
 
 if __name__ == "__main__":
