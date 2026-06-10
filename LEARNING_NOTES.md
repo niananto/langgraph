@@ -257,6 +257,34 @@ Key facts about LLaMA 3.1 8B embeddings:
 
 ---
 
+## Parked ideas (unexplored, revisit later)
+
+### Debug Ollama internals with Delve (Go debugger)
+
+Ollama is a Go process (`ollama serve`) — a completely separate layer from
+Python. To put breakpoints inside it:
+
+1. Install Go + VS Code Go extension
+2. Clone `github.com/ollama/ollama`
+3. Build debug binary: `go build -gcflags="all=-N -l" .`
+4. Install Delve: `go install github.com/go-delve/delve/cmd/dlv@latest`
+5. Launch Ollama through Delve (VS Code Go launch config, type `"go"`)
+6. Key files to break in:
+   - `server/routes.go` — `/api/chat` handler, where raw token text gets
+     converted into the structured `tool_calls` JSON field
+   - `llm/server.go` — manages the llama.cpp subprocess underneath
+
+Below Ollama sits **llama.cpp (C++)** — the actual inference engine. Debugging
+that layer requires gdb/lldb and compiling llama.cpp from source with debug
+symbols. Much deeper rabbit hole.
+
+Why this is interesting: `ollama_direct.py --raw` shows what comes *out* of
+the raw token stream (`<|python_tag|>{...}`). Setting a breakpoint in
+`server/routes.go` would show exactly how Ollama detects that pattern and
+converts it into the `tool_calls` dict the Python layer receives.
+
+---
+
 ## Commit history (this work)
 
 - `b5fc294c` — chore: add learning scripts for LangGraph internals
