@@ -31,9 +31,14 @@ confusion dropped to zero — the "safe separation" for tool naming.
 
 Run:
     python tool_confusion_experiment.py
-    python tool_confusion_experiment.py --no-bert --no-wmd   # skip large downloads
-    python tool_confusion_experiment.py --model llama3.2:3b  # different model
-    python tool_confusion_experiment.py --runs 2             # faster smoke-test
+    python tool_confusion_experiment.py --no-bert --no-wmd        # skip large downloads
+    python tool_confusion_experiment.py --model llama3.2:3b       # different chat model
+    python tool_confusion_experiment.py --embed-model nomic-embed-text  # dedicated embed model
+    python tool_confusion_experiment.py --runs 2                  # faster smoke-test
+
+If Ollama returns 501 for /api/embed, pull a dedicated embedding model:
+    ollama pull nomic-embed-text
+    python tool_confusion_experiment.py --embed-model nomic-embed-text
 """
 
 from __future__ import annotations
@@ -65,8 +70,9 @@ if hasattr(sys.stdout, "reconfigure"):
 _argv = sys.argv[1:]
 SKIP_BERT = "--no-bert" in _argv
 SKIP_WMD  = "--no-wmd"  in _argv
-MODEL = next((_argv[i + 1] for i, a in enumerate(_argv) if a == "--model"), "llama3.1:8b")
-RUNS  = int(next((_argv[i + 1] for i, a in enumerate(_argv) if a == "--runs"), 4))
+MODEL       = next((_argv[i + 1] for i, a in enumerate(_argv) if a == "--model"),       "llama3.1:8b")
+EMBED_MODEL = next((_argv[i + 1] for i, a in enumerate(_argv) if a == "--embed-model"), MODEL)
+RUNS        = int(next((_argv[i + 1] for i, a in enumerate(_argv) if a == "--runs"),    4))
 OLLAMA_BASE = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
 SEP  = "=" * 72
@@ -320,28 +326,38 @@ def sbert_similarities() -> dict[tuple, float] | None:
 
 
 def _ollama_embed_one(text: str) -> np.ndarray:
-    """/api/embed (Ollama ≥ 0.1.26) with fallback to /api/embeddings (older)."""
-    for endpoint, payload_key, result_key in [
-        ("/api/embed",       "input",  "embeddings"),
-        ("/api/embeddings",  "prompt", "embedding"),
-    ]:
+    """Try every known Ollama embed endpoint/format until one works.
+
+    Ollama changed its embed API across versions:
+    - /api/embed  with input as string   (0.1.26 – some 0.3.x builds)
+    - /api/embed  with input as array    (newer 0.3.x+ — required format)
+    - /api/embeddings with prompt string (pre-0.1.26, still works as fallback)
+    Returns 501 when the model manifest has no embedding support.
+    """
+    candidates = [
+        ("/api/embed",       {"model": EMBED_MODEL, "input": [text]},  "embeddings"),
+        ("/api/embed",       {"model": EMBED_MODEL, "input": text},    "embeddings"),
+        ("/api/embeddings",  {"model": EMBED_MODEL, "prompt": text},   "embedding"),
+    ]
+    for endpoint, payload, result_key in candidates:
         try:
             resp = requests.post(
-                f"{OLLAMA_BASE}{endpoint}",
-                json={"model": MODEL, payload_key: text},
-                timeout=300,
+                f"{OLLAMA_BASE}{endpoint}", json=payload, timeout=300
             )
-            if resp.status_code == 501:
-                continue          # endpoint not implemented — try next
+            if resp.status_code in (404, 501):
+                continue
             resp.raise_for_status()
-            data = resp.json()
-            vec = data[result_key]
-            if isinstance(vec[0], list):  # /api/embed wraps in an outer list
+            vec = resp.json()[result_key]
+            if isinstance(vec[0], list):   # /api/embed wraps in outer list
                 vec = vec[0]
             return np.array(vec, dtype=np.float32)
-        except (requests.HTTPError, KeyError):
+        except (requests.HTTPError, KeyError, IndexError):
             continue
-    raise RuntimeError("No working Ollama embed endpoint found")
+    raise RuntimeError(
+        f"No working Ollama embed endpoint for model '{EMBED_MODEL}'.\n"
+        "  Try:  ollama pull nomic-embed-text\n"
+        "  Then: python tool_confusion_experiment.py --embed-model nomic-embed-text"
+    )
 
 
 def ollama_similarities() -> dict[tuple, float] | None:
