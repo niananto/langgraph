@@ -243,7 +243,11 @@ def tfidf_similarities() -> dict[tuple, float]:
     from sklearn.metrics.pairwise import cosine_similarity as sk_cos
 
     docs = [TOOL_TEXTS[n] for n in TOOL_NAMES]
-    mat  = TfidfVectorizer().fit_transform(docs).toarray()
+    # use_idf=False: removes the inverse-document-frequency weighting.
+    # With only 4 documents, IDF aggressively penalizes shared terms and
+    # collapses all pair scores to near-zero. Plain TF cosine gives a
+    # meaningful spread where shared vocabulary actually raises similarity.
+    mat  = TfidfVectorizer(use_idf=False).fit_transform(docs).toarray()
     sims = {}
     for a, b in TOOL_PAIRS:
         va = mat[TOOL_NAMES.index(a)]
@@ -315,25 +319,39 @@ def sbert_similarities() -> dict[tuple, float] | None:
         return None
 
 
+def _ollama_embed_one(text: str) -> np.ndarray:
+    """/api/embed (Ollama ≥ 0.1.26) with fallback to /api/embeddings (older)."""
+    for endpoint, payload_key, result_key in [
+        ("/api/embed",       "input",  "embeddings"),
+        ("/api/embeddings",  "prompt", "embedding"),
+    ]:
+        try:
+            resp = requests.post(
+                f"{OLLAMA_BASE}{endpoint}",
+                json={"model": MODEL, payload_key: text},
+                timeout=300,
+            )
+            if resp.status_code == 501:
+                continue          # endpoint not implemented — try next
+            resp.raise_for_status()
+            data = resp.json()
+            vec = data[result_key]
+            if isinstance(vec[0], list):  # /api/embed wraps in an outer list
+                vec = vec[0]
+            return np.array(vec, dtype=np.float32)
+        except (requests.HTTPError, KeyError):
+            continue
+    raise RuntimeError("No working Ollama embed endpoint found")
+
+
 def ollama_similarities() -> dict[tuple, float] | None:
     try:
-        # warm-up: first /api/embed call loads the model into memory, which
-        # can take minutes — give it a generous timeout and a throwaway call
-        requests.post(
-            f"{OLLAMA_BASE}/api/embed",
-            json={"model": MODEL, "input": "warm-up"},
-            timeout=600,
-        ).raise_for_status()
+        # warm-up: model load can take minutes on first embed call
+        _ollama_embed_one("warm-up")
 
         vecs = {}
         for name in TOOL_NAMES:
-            resp = requests.post(
-                f"{OLLAMA_BASE}/api/embed",
-                json={"model": MODEL, "input": TOOL_TEXTS[name]},
-                timeout=300,
-            )
-            resp.raise_for_status()
-            vecs[name] = np.array(resp.json()["embeddings"][0], dtype=np.float32)
+            vecs[name] = _ollama_embed_one(TOOL_TEXTS[name])
 
         sims = {}
         for a, b in TOOL_PAIRS:
