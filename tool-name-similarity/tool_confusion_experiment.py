@@ -1,19 +1,24 @@
 """
 tool_confusion_experiment.py — at what embedding distance do tools stop confusing an LLM?
 
-4 tools whose names are all dictionary synonyms for "locate something"
-(search / find / look up / track) but whose intents, contexts, and argument
-types are completely distinct:
+v3 — similarity LADDER design.  Earlier versions established the endpoints:
+  v1: same intent + same `query` arg            → SBERT 0.73, 38% confusion
+  v2: dictionary-synonym names, distinct intent → SBERT max 0.47, ~no confusion
 
-  T1  search_products(keywords)       — catalog discovery
-  T2  find_stores(city)               — physical store locator
-  T3  lookup_warranty(serial_number)  — warranty coverage status
-  T4  track_order(order_id)           — shipping status
+v3 deliberately spans the zones in between.  4 tools, all defensibly distinct
+in real life (different argument types, different jobs), but with description
+vocabulary engineered to hit SBERT similarity targets:
 
-The verbs overlap at the dictionary level; nothing else does.  This isolates
-the question: does name-level synonymy alone confuse the router, or does it
-take intent overlap (as in the earlier search_products/find_items design,
-which shared a `query` argument and 38% cross-confusion)?
+  T1  search_products(keywords)        — keyword discovery
+  T2  check_stock(product_name)        — availability of a KNOWN product
+                                          target vs T1: SBERT > 0.7
+  T3  list_category_products(category) — category browsing
+                                          target vs T1/T2: SBERT 0.5–0.7
+  T4  track_order(order_id)            — shipping status (low anchor < 0.35)
+
+The T1/T2 boundary is the interesting one: "I want a wireless mouse" (discover)
+vs "Is the MX Master 3S in stock?" (check availability).  A human never
+confuses these.  The question is at what description-similarity the model does.
 
 12 prompts (3 per tool, ground-truth labelled but tool name never mentioned;
 each prompt carries the identifier its tool needs, so correct routing can
@@ -83,7 +88,7 @@ SEP2 = "-" * 72
 # T1 — search_products  (catalog discovery by keyword)
 # ---------------------------------------------------------------------------
 def search_products(keywords: str) -> str:
-    """Search the product catalog by keyword to discover products to buy."""
+    """Search the store's product catalog by keyword to discover products customers can buy."""
     return json.dumps([
         {"id": "P1", "name": f"Match for '{keywords}' #1", "price_usd": 49},
         {"id": "P2", "name": f"Match for '{keywords}' #2", "price_usd": 89},
@@ -91,34 +96,38 @@ def search_products(keywords: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# T2 — find_stores  ("find" ≈ "search" in the dictionary, but the intent is
-#                     a physical store locator — completely different job)
+# T2 — check_stock  (availability of a KNOWN product — distinct intent from
+#                    T1's discovery, but maximal description overlap:
+#                    product / store / catalog / customers / buy)
+#                    target: SBERT > 0.7 vs T1
 # ---------------------------------------------------------------------------
-def find_stores(city: str) -> str:
-    """Find physical retail store locations in a given city."""
-    return json.dumps([
-        {"store_id": "S1", "address": f"12 Main St, {city}", "open_until": "21:00"},
-        {"store_id": "S2", "address": f"450 Market Ave, {city}", "open_until": "20:00"},
-    ])
-
-
-# ---------------------------------------------------------------------------
-# T3 — lookup_warranty  ("look up" ≈ "search" in the dictionary, but the
-#                         intent is warranty status by serial number)
-# ---------------------------------------------------------------------------
-def lookup_warranty(serial_number: str) -> str:
-    """Look up the warranty coverage status of a purchased device by its serial number."""
+def check_stock(product_name: str) -> str:
+    """Check whether a specific product in the store catalog is currently in stock for customers to buy."""
     return json.dumps({
-        "serial_number": serial_number,
-        "covered": True,
-        "expires": "2027-03-15",
-        "plan": "standard 2-year",
+        "product_name": product_name,
+        "in_stock": True,
+        "units_left": 7,
+        "restock_date": None,
     })
 
 
 # ---------------------------------------------------------------------------
-# T4 — track_order  ("track" ≈ "follow/locate" in the dictionary, but the
-#                     intent is shipping status by order ID)
+# T3 — list_category_products  (category browsing — same store/product
+#                               domain, different operation)
+#                               target: SBERT 0.5–0.7 vs T1 and T2
+# ---------------------------------------------------------------------------
+def list_category_products(category: str) -> str:
+    """List all products the store carries within a given product category."""
+    return json.dumps([
+        {"id": "C1", "category": category, "name": "Product A", "price_usd": 120},
+        {"id": "C2", "category": category, "name": "Product B", "price_usd": 250},
+        {"id": "C3", "category": category, "name": "Product C", "price_usd": 75},
+    ])
+
+
+# ---------------------------------------------------------------------------
+# T4 — track_order  (low-similarity anchor: different domain entirely)
+#                    target: SBERT < 0.35 vs everything
 # ---------------------------------------------------------------------------
 def track_order(order_id: str) -> str:
     """Track the shipping and delivery status of a customer order by its order ID."""
@@ -130,32 +139,34 @@ def track_order(order_id: str) -> str:
     })
 
 
-TOOLS = [search_products, find_stores, lookup_warranty, track_order]
+TOOLS = [search_products, check_stock, list_category_products, track_order]
 TOOL_NAMES = [t.__name__ for t in TOOLS]
 
 
 # ---------------------------------------------------------------------------
 # 12 prompts — ground truth labelled, tool name never mentioned.
-# Every prompt includes the identifier its tool requires (serial, order id,
-# city) so a correct routing decision can never fail on missing arguments.
+# T1 prompts = vague discovery (user doesn't know the exact product).
+# T2 prompts = user names an EXACT product and asks about availability.
+# The human-obvious distinction is discovery vs availability; whether the
+# model preserves it under high description similarity is the experiment.
 # ---------------------------------------------------------------------------
 PROMPTS: list[dict] = [
-    # ── T1: search_products  (shopping/discovery intent) ─────────────────
-    {"tool": "search_products",  "text": "I want to buy a wireless mouse — what do you have?"},
-    {"tool": "search_products",  "text": "Show me some noise-cancelling headphones I could order."},
-    {"tool": "search_products",  "text": "I'm shopping for a budget mechanical keyboard."},
-    # ── T2: find_stores  (physical location intent) ──────────────────────
-    {"tool": "find_stores",      "text": "Is there a branch of yours in Chicago?"},
-    {"tool": "find_stores",      "text": "Where can I visit you in person around Seattle?"},
-    {"tool": "find_stores",      "text": "I'd like to walk into one of your shops in Boston — where exactly?"},
-    # ── T3: lookup_warranty  (coverage status intent) ─────────────────────
-    {"tool": "lookup_warranty",  "text": "My laptop's serial number is SN-99887 — is it still covered?"},
-    {"tool": "lookup_warranty",  "text": "I bought a blender last year, serial BL-1234. Am I covered if it breaks?"},
-    {"tool": "lookup_warranty",  "text": "Can you check coverage for my device with serial X5-0042?"},
+    # ── T1: search_products  (discovery intent, no specific product) ──────
+    {"tool": "search_products",        "text": "I want to buy a wireless mouse — what do you have?"},
+    {"tool": "search_products",        "text": "Show me some options for noise-cancelling headphones."},
+    {"tool": "search_products",        "text": "I'm shopping for a budget mechanical keyboard, any suggestions?"},
+    # ── T2: check_stock  (exact product named, availability intent) ───────
+    {"tool": "check_stock",            "text": "Is the Logitech MX Master 3S in stock right now?"},
+    {"tool": "check_stock",            "text": "Do you currently have the Sony WH-1000XM5 available?"},
+    {"tool": "check_stock",            "text": "Can I get a Keychron K2 today, or is it sold out?"},
+    # ── T3: list_category_products  (category exploration intent) ─────────
+    {"tool": "list_category_products", "text": "What's in your laptop section?"},
+    {"tool": "list_category_products", "text": "Show me everything you carry under home office furniture."},
+    {"tool": "list_category_products", "text": "List what you have in the audio accessories category."},
     # ── T4: track_order  (shipping status intent) ─────────────────────────
-    {"tool": "track_order",      "text": "Order ORD-5522 — where is it right now?"},
-    {"tool": "track_order",      "text": "My package from order ORD-1001 hasn't arrived. What's the status?"},
-    {"tool": "track_order",      "text": "When will order ORD-7733 be delivered?"},
+    {"tool": "track_order",            "text": "Order ORD-5522 — where is it right now?"},
+    {"tool": "track_order",            "text": "My package from order ORD-1001 hasn't arrived. What's the status?"},
+    {"tool": "track_order",            "text": "When will order ORD-7733 be delivered?"},
 ]
 
 SYSTEM_PROMPT = (
