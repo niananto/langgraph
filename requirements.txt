@@ -11,3 +11,7 @@ debugpy
 numpy
 safetensors
 huggingface_hub
+scikit-learn
+bert-score
+gensim
+sentence-transformers
