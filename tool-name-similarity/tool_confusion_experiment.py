@@ -326,17 +326,15 @@ def sbert_similarities() -> dict[tuple, float] | None:
 
 
 def _ollama_embed_one(text: str) -> np.ndarray:
-    """Try every known Ollama embed endpoint/format until one works.
+    """Try known Ollama embed formats in order of most-likely-to-work.
 
-    Ollama changed its embed API across versions:
-    - /api/embed  with input as string   (0.1.26 – some 0.3.x builds)
-    - /api/embed  with input as array    (newer 0.3.x+ — required format)
-    - /api/embeddings with prompt string (pre-0.1.26, still works as fallback)
-    Returns 501 when the model manifest has no embedding support.
+    String input  ("/api/embed", input=str)  — works on 0.30.x and confirmed
+    by tool_name_embeddings.py.  Array input and the legacy /api/embeddings
+    endpoint are kept as fallbacks for other versions.
     """
     candidates = [
-        ("/api/embed",       {"model": EMBED_MODEL, "input": [text]},  "embeddings"),
         ("/api/embed",       {"model": EMBED_MODEL, "input": text},    "embeddings"),
+        ("/api/embed",       {"model": EMBED_MODEL, "input": [text]},  "embeddings"),
         ("/api/embeddings",  {"model": EMBED_MODEL, "prompt": text},   "embedding"),
     ]
     for endpoint, payload, result_key in candidates:
@@ -362,9 +360,6 @@ def _ollama_embed_one(text: str) -> np.ndarray:
 
 def ollama_similarities() -> dict[tuple, float] | None:
     try:
-        # warm-up: model load can take minutes on first embed call
-        _ollama_embed_one("warm-up")
-
         vecs = {}
         for name in TOOL_NAMES:
             vecs[name] = _ollama_embed_one(TOOL_TEXTS[name])
