@@ -1,15 +1,23 @@
 """
 tool_confusion_experiment.py — at what embedding distance do tools stop confusing an LLM?
 
-4 tools in an e-commerce store assistant domain, designed on a deliberate
-similarity ladder:
+4 tools whose names are all dictionary synonyms for "locate something"
+(search / find / look up / track) but whose intents, contexts, and argument
+types are completely distinct:
 
-  T1  search_products  ↔  T2  find_items       ~very similar  (synonyms)
-  T1  search_products  ↔  T3  browse_category   ~moderate      (same domain)
-  T1  search_products  ↔  T4  track_order       ~low           (different purpose)
+  T1  search_products(keywords)       — catalog discovery
+  T2  find_stores(city)               — physical store locator
+  T3  lookup_warranty(serial_number)  — warranty coverage status
+  T4  track_order(order_id)           — shipping status
 
-12 prompts (3 per tool, ground-truth labelled but tool name never mentioned).
-4 runs per prompt = 48 total runs.
+The verbs overlap at the dictionary level; nothing else does.  This isolates
+the question: does name-level synonymy alone confuse the router, or does it
+take intent overlap (as in the earlier search_products/find_items design,
+which shared a `query` argument and 38% cross-confusion)?
+
+12 prompts (3 per tool, ground-truth labelled but tool name never mentioned;
+each prompt carries the identifier its tool needs, so correct routing can
+never fail on missing arguments).  4 runs per prompt = 48 total runs.
 
 5 similarity metrics computed once upfront for all 6 tool pairs:
   1. TF-IDF cosine           (sklearn)
@@ -66,44 +74,48 @@ SEP2 = "-" * 72
 
 
 # ---------------------------------------------------------------------------
-# T1 — search_products  (broad keyword search)
+# T1 — search_products  (catalog discovery by keyword)
 # ---------------------------------------------------------------------------
-def search_products(query: str) -> str:
-    """Search the product catalog for items matching a keyword or name."""
+def search_products(keywords: str) -> str:
+    """Search the product catalog by keyword to discover products to buy."""
     return json.dumps([
-        {"id": "P1", "name": f"Result for '{query}' #1", "price_usd": 49},
-        {"id": "P2", "name": f"Result for '{query}' #2", "price_usd": 89},
+        {"id": "P1", "name": f"Match for '{keywords}' #1", "price_usd": 49},
+        {"id": "P2", "name": f"Match for '{keywords}' #2", "price_usd": 89},
     ])
 
 
 # ---------------------------------------------------------------------------
-# T2 — find_items  (stock / availability — synonym of T1)
+# T2 — find_stores  ("find" ≈ "search" in the dictionary, but the intent is
+#                     a physical store locator — completely different job)
 # ---------------------------------------------------------------------------
-def find_items(query: str) -> str:
-    """Find available items in the store inventory that match a search term."""
+def find_stores(city: str) -> str:
+    """Find physical retail store locations in a given city."""
     return json.dumps([
-        {"id": "I1", "name": f"In-stock match for '{query}'", "available": True},
-        {"id": "I2", "name": f"Limited stock: '{query}'",     "available": True},
+        {"store_id": "S1", "address": f"12 Main St, {city}", "open_until": "21:00"},
+        {"store_id": "S2", "address": f"450 Market Ave, {city}", "open_until": "20:00"},
     ])
 
 
 # ---------------------------------------------------------------------------
-# T3 — browse_category  (moderately similar to T1/T2)
+# T3 — lookup_warranty  ("look up" ≈ "search" in the dictionary, but the
+#                         intent is warranty status by serial number)
 # ---------------------------------------------------------------------------
-def browse_category(category: str) -> str:
-    """Browse and list all products belonging to a specific store category."""
-    return json.dumps([
-        {"id": "C1", "category": category, "name": "Product A"},
-        {"id": "C2", "category": category, "name": "Product B"},
-        {"id": "C3", "category": category, "name": "Product C"},
-    ])
+def lookup_warranty(serial_number: str) -> str:
+    """Look up the warranty coverage status of a purchased device by its serial number."""
+    return json.dumps({
+        "serial_number": serial_number,
+        "covered": True,
+        "expires": "2027-03-15",
+        "plan": "standard 2-year",
+    })
 
 
 # ---------------------------------------------------------------------------
-# T4 — track_order  (clearly different domain)
+# T4 — track_order  ("track" ≈ "follow/locate" in the dictionary, but the
+#                     intent is shipping status by order ID)
 # ---------------------------------------------------------------------------
 def track_order(order_id: str) -> str:
-    """Track the shipping and delivery status of a customer order by ID."""
+    """Track the shipping and delivery status of a customer order by its order ID."""
     return json.dumps({
         "order_id": order_id,
         "status": "in_transit",
@@ -112,30 +124,32 @@ def track_order(order_id: str) -> str:
     })
 
 
-TOOLS = [search_products, find_items, browse_category, track_order]
+TOOLS = [search_products, find_stores, lookup_warranty, track_order]
 TOOL_NAMES = [t.__name__ for t in TOOLS]
 
 
 # ---------------------------------------------------------------------------
-# 12 prompts — ground truth labelled, tool name never mentioned
+# 12 prompts — ground truth labelled, tool name never mentioned.
+# Every prompt includes the identifier its tool requires (serial, order id,
+# city) so a correct routing decision can never fail on missing arguments.
 # ---------------------------------------------------------------------------
 PROMPTS: list[dict] = [
-    # ── T1: search_products ──────────────────────────────────────────────
-    {"tool": "search_products",  "text": "I'm looking for a wireless mouse."},
-    {"tool": "search_products",  "text": "Do you carry noise-cancelling headphones?"},
-    {"tool": "search_products",  "text": "Can you find me something suitable for 4K gaming?"},
-    # ── T2: find_items ───────────────────────────────────────────────────
-    {"tool": "find_items",       "text": "Is the Samsung Galaxy S24 available right now?"},
-    {"tool": "find_items",       "text": "What gaming keyboards do you currently have in stock?"},
-    {"tool": "find_items",       "text": "I need a USB-C hub I can buy and receive today."},
-    # ── T3: browse_category ──────────────────────────────────────────────
-    {"tool": "browse_category",  "text": "What's in your laptop section?"},
-    {"tool": "browse_category",  "text": "Show me everything under home office furniture."},
-    {"tool": "browse_category",  "text": "What products do you carry in the audio accessories area?"},
-    # ── T4: track_order ──────────────────────────────────────────────────
-    {"tool": "track_order",      "text": "I placed an order last week — where is it?"},
-    {"tool": "track_order",      "text": "Can you look up order ORD-5522 for me?"},
-    {"tool": "track_order",      "text": "My delivery is late, can you check on it?"},
+    # ── T1: search_products  (shopping/discovery intent) ─────────────────
+    {"tool": "search_products",  "text": "I want to buy a wireless mouse — what do you have?"},
+    {"tool": "search_products",  "text": "Show me some noise-cancelling headphones I could order."},
+    {"tool": "search_products",  "text": "I'm shopping for a budget mechanical keyboard."},
+    # ── T2: find_stores  (physical location intent) ──────────────────────
+    {"tool": "find_stores",      "text": "Is there a branch of yours in Chicago?"},
+    {"tool": "find_stores",      "text": "Where can I visit you in person around Seattle?"},
+    {"tool": "find_stores",      "text": "I'd like to walk into one of your shops in Boston — where exactly?"},
+    # ── T3: lookup_warranty  (coverage status intent) ─────────────────────
+    {"tool": "lookup_warranty",  "text": "My laptop's serial number is SN-99887 — is it still covered?"},
+    {"tool": "lookup_warranty",  "text": "I bought a blender last year, serial BL-1234. Am I covered if it breaks?"},
+    {"tool": "lookup_warranty",  "text": "Can you check coverage for my device with serial X5-0042?"},
+    # ── T4: track_order  (shipping status intent) ─────────────────────────
+    {"tool": "track_order",      "text": "Order ORD-5522 — where is it right now?"},
+    {"tool": "track_order",      "text": "My package from order ORD-1001 hasn't arrived. What's the status?"},
+    {"tool": "track_order",      "text": "When will order ORD-7733 be delivered?"},
 ]
 
 SYSTEM_PROMPT = (
@@ -279,6 +293,7 @@ def wmd_similarities() -> dict[tuple, float] | None:
         return {pair: 1.0 / (1.0 + d) for pair, d in raw_dists.items()}
     except Exception as exc:
         print(f"  [WMD] skipped — {exc}")
+        print("  Tip: WMD needs the POT package ->  pip install POT")
         return None
 
 
@@ -302,12 +317,20 @@ def sbert_similarities() -> dict[tuple, float] | None:
 
 def ollama_similarities() -> dict[tuple, float] | None:
     try:
+        # warm-up: first /api/embed call loads the model into memory, which
+        # can take minutes — give it a generous timeout and a throwaway call
+        requests.post(
+            f"{OLLAMA_BASE}/api/embed",
+            json={"model": MODEL, "input": "warm-up"},
+            timeout=600,
+        ).raise_for_status()
+
         vecs = {}
         for name in TOOL_NAMES:
             resp = requests.post(
                 f"{OLLAMA_BASE}/api/embed",
                 json={"model": MODEL, "input": TOOL_TEXTS[name]},
-                timeout=60,
+                timeout=300,
             )
             resp.raise_for_status()
             vecs[name] = np.array(resp.json()["embeddings"][0], dtype=np.float32)
@@ -328,12 +351,17 @@ def ollama_similarities() -> dict[tuple, float] | None:
 # Analysis helpers
 # ---------------------------------------------------------------------------
 def confusion_rate(runs: list[RunResult], tool_a: str, tool_b: str) -> float:
-    """Fraction of runs where truth=tool_a but model called tool_b, or vice versa."""
+    """Fraction of runs where the model crossed the pair: truth was tool_a but
+    it called tool_b, or vice versa.  Tool execution errors on the *correct*
+    tool are routing successes, not confusion, so they're excluded.
+    """
     relevant = [r for r in runs if r.ground_truth in (tool_a, tool_b)]
     if not relevant:
         return 0.0
-    confused = [r for r in relevant if not r.success
-                and r.tool_called in (tool_a, tool_b)]
+    confused = [
+        r for r in relevant
+        if r.tool_called in (tool_a, tool_b) and r.tool_called != r.ground_truth
+    ]
     return len(confused) / len(relevant)
 
 
@@ -429,7 +457,9 @@ def main() -> None:
         total      = len(tool_runs)
         wrong_calls = {}
         for r in tool_runs:
-            if not r.success and r.tool_called:
+            # only count routing mistakes — a tool error on the right tool
+            # is an execution failure, not confusion with itself
+            if not r.success and r.tool_called and r.tool_called != r.ground_truth:
                 wrong_calls[r.tool_called] = wrong_calls.get(r.tool_called, 0) + 1
         confusion_str = "  confused with: " + ", ".join(
             f"{k}×{v}" for k, v in sorted(wrong_calls.items(), key=lambda x: -x[1])
