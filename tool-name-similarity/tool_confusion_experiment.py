@@ -24,12 +24,13 @@ confuses these.  The question is at what description-similarity the model does.
 each prompt carries the identifier its tool needs, so correct routing can
 never fail on missing arguments).  4 runs per prompt = 48 total runs.
 
-5 similarity metrics computed once upfront for all 6 tool pairs:
-  1. TF-IDF cosine           (sklearn)
-  2. BERTScore F1            (bert-score, ~500 MB download first run)
-  3. Word Mover's Distance   (gensim + GloVe-100, ~128 MB download first run)
-  4. Sentence-BERT cosine    (sentence-transformers, ~80 MB download first run)
-  5. Ollama embedding cosine (/api/embed — same model that routes the calls)
+6 similarity metrics computed once upfront for all 6 tool pairs:
+  1. Cosine (bag-of-words)   (sklearn CountVectorizer — raw word-count cosine)
+  2. TF-IDF cosine           (sklearn, use_idf=False — TF cosine)
+  3. BERTScore F1            (bert-score, ~500 MB download first run)
+  4. Word Mover's Distance   (gensim + GloVe-100, ~128 MB download first run)
+  5. Sentence-BERT cosine    (sentence-transformers, ~80 MB download first run)
+  6. Ollama embedding cosine (/api/embed — same model that routes the calls)
 
 Headline output: for each metric, the similarity threshold below which
 confusion dropped to zero — the "safe separation" for tool naming.
@@ -255,6 +256,26 @@ TOOL_TEXTS = {t.__name__: f"{t.__name__}: {t.__doc__}" for t in TOOLS}
 TOOL_PAIRS  = list(combinations(TOOL_NAMES, 2))   # 6 pairs
 
 
+def cosine_similarities() -> dict[tuple, float]:
+    """Basic bag-of-words cosine similarity on raw word-count vectors.
+
+    The textbook "cosine similarity": each description becomes a vector of
+    raw term counts (no TF normalization, no IDF weighting), then cosine of
+    the angle between the two count vectors. Pure lexical overlap.
+    """
+    from sklearn.feature_extraction.text import CountVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity as sk_cos
+
+    docs = [TOOL_TEXTS[n] for n in TOOL_NAMES]
+    mat  = CountVectorizer().fit_transform(docs).toarray()
+    sims = {}
+    for a, b in TOOL_PAIRS:
+        va = mat[TOOL_NAMES.index(a)]
+        vb = mat[TOOL_NAMES.index(b)]
+        sims[(a, b)] = float(sk_cos([va], [vb])[0][0])
+    return sims
+
+
 def tfidf_similarities() -> dict[tuple, float]:
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity as sk_cos
@@ -425,6 +446,10 @@ def main() -> None:
     # ── Similarity metrics (computed once) ────────────────────────────────
     print("\n[1/3]  Computing similarity metrics...")
     metrics: dict[str, dict[tuple, float] | None] = {}
+
+    print("  Cosine (bag-of-words)...", end=" ", flush=True)
+    metrics["Cosine"] = cosine_similarities()
+    print("done")
 
     print("  TF-IDF...", end=" ", flush=True)
     metrics["TF-IDF"] = tfidf_similarities()
