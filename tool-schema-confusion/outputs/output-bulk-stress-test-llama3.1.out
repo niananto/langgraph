@@ -1,0 +1,232 @@
+(langgraph) F:\langgraph>uv run tool-schema-confusion\bulk_stress_test.py
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Model : llama3.1:8b
+Plan  : 4 tools × 5 prompts × 5 runs = 100 total attempts
+
+======================================================================
+D1  book_restaurant
+======================================================================
+
+  P1: "Book a table for 4 at 'The Golden Fork' on 2026-07-15 at 19:..."
+    run 1/5  +  ok  (59.0s)
+    run 2/5  +  ok  (6.1s)
+    run 3/5  +  ok  (5.7s)
+    run 4/5  +  ok  (6.8s)
+    run 5/5  +  ok  (5.5s)
+  -> 5/5  [#########################]
+
+  P2: "Reserve a spot for 2 at 'Sakura Garden' on 2026-06-11 at 20:..."
+    run 1/5  +  ok  (8.4s)
+    run 2/5  +  ok  (5.4s)
+    run 3/5  x  no tool called  (3.2s)
+    run 4/5  x  no tool called  (3.2s)
+    run 5/5  +  ok  (5.7s)
+  -> 3/5  [###############..........]
+
+  P3: 'Can you book La Bella Italia for 6 guests on 2026-08-01 at 1...'
+    run 1/5  +  ok  (8.2s)
+    run 2/5  +  ok  (6.6s)
+    run 3/5  +  ok  (7.8s)
+    run 4/5  +  ok  (7.7s)
+    run 5/5  +  ok  (6.4s)
+  -> 5/5  [#########################]
+
+  P4: 'Please reserve The Steakhouse for 8 people on 2026-09-20 at ...'
+    run 1/5  +  ok  (9.0s)
+    run 2/5  +  ok  (8.1s)
+    run 3/5  x  no tool called  (3.2s)
+    run 4/5  +  ok  (7.9s)
+    run 5/5  +  ok  (7.6s)
+  -> 4/5  [####################.....]
+
+  P5: 'Get me a table at Café Paris for 3 on 2026-07-04 at 12:30. O...'
+    run 1/5  +  ok  (9.1s)
+    run 2/5  +  ok  (8.5s)
+    run 3/5  +  ok  (8.6s)
+    run 4/5  +  ok  (8.0s)
+    run 5/5  +  ok  (8.2s)
+  -> 5/5  [#########################]
+
+  SUBTOTAL  22/25  [######################...]   88%
+
+======================================================================
+D2  plan_vacation
+======================================================================
+
+  P1: 'Plan 10 days in Tokyo for Alice Smith, age 29, passport AB12...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (45.4s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (56.4s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (59.2s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (58.6s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (48.8s)
+  -> 0/5  [.........................]
+
+  P2: 'Plan a 7-day trip to Paris for Bob Jones, 45 years old, pass...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (24.5s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (52.1s)
+    run 3/5  x  no tool called  (4.5s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (38.8s)
+    run 5/5  x  no tool called  (4.8s)
+  -> 0/5  [.........................]
+
+  P3: 'Organise 14 days in Bali for Carol Lee, age 33, passport EF3...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (46.3s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (52.0s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (41.8s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (40.0s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (42.5s)
+  -> 0/5  [.........................]
+
+  P4: 'I need a 5-day New York trip for David Park, 27, passport GH...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (31.7s)
+    run 2/5  x  no tool called  (4.4s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (29.5s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (32.6s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (42.7s)
+  -> 0/5  [.........................]
+
+  P5: 'Set up 21 days in Australia for Emma Wilson, 52, passport IJ...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (41.3s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (44.8s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (23.0s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (29.2s)
+    run 5/5  x  no tool called  (4.5s)
+  -> 0/5  [.........................]
+
+  SUBTOTAL  0/25  [.........................]    0%
+
+======================================================================
+D3  place_order
+======================================================================
+
+  P1: 'Order 2 units of PROD-789. Ship to 42 Maple St, Springfield,...'
+    run 1/5  x  no tool called  (8.0s)
+    run 2/5  x  no tool called  (5.8s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (1084.5s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (52.5s)
+    run 5/5  x  no tool called  (5.7s)
+  -> 0/5  [.........................]
+
+  P2: 'Buy 1 of ITEM-456. Deliver to 15 Oak Ave, London, UK, EC1A 1...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (653.6s)
+    run 2/5  x  no tool called  (6.2s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (16.2s)
+    run 4/5  x  tool error: Error: ToolInvocationError('  (13.9s)
+    run 5/5  x  tool error: Error: ToolInvocationError('  (12.6s)
+  -> 0/5  [.........................]
+
+  P3: 'Purchase 3x SKU-101. Address: 100 Baker St, Manchester, UK, ...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (2586.1s)
+    run 2/5  x  no tool called  (8.5s)
+    run 3/5  x  no tool called  (5.4s)
+    run 4/5  x  no tool called  (5.2s)
+    run 5/5  x  no tool called  (5.1s)
+  -> 0/5  [.........................]
+
+  P4: 'Order 5 of GADGET-222. Ship to 7 Pine Rd, Toronto, Canada, M...'
+    run 1/5  x  no tool called  (6.5s)
+    run 2/5  x  no tool called  (5.6s)
+    run 3/5  x  no tool called  (6.4s)
+    run 4/5  x  no tool called  (5.8s)
+    run 5/5  x  no tool called  (5.6s)
+  -> 0/5  [.........................]
+
+  P5: 'Get me 10x BULK-333. 88 Elm St, Sydney, Australia, 2000, exp...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (14.7s)
+    run 2/5  x  no tool called  (5.7s)
+    run 3/5  x  no tool called  (5.3s)
+    run 4/5  x  no tool called  (5.8s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (34.6s)
+  -> 0/5  [.........................]
+
+  SUBTOTAL  0/25  [.........................]    0%
+
+======================================================================
+D4  deploy_application
+======================================================================
+
+  P1: "Deploy 'payments-service' image tag v2.5.1. Cluster: prod-cl..."
+    run 1/5  x  no tool called  (9.7s)
+    run 2/5  x  no tool called  (6.7s)
+    run 3/5  x  no tool called  (8.0s)
+    run 4/5  x  no tool called  (7.2s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (25.2s)
+  -> 0/5  [.........................]
+
+  P2: "Deploy 'auth-service' tag v1.0.0. Cluster: staging-cluster i..."
+    run 1/5  x  no tool called  (12.4s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (25.1s)
+    run 3/5  x  no tool called  (8.1s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (228.1s)
+    run 5/5  x  no tool called  (8.3s)
+  -> 0/5  [.........................]
+
+  P3: "Deploy 'frontend' image v3.1.0 to dev-cluster in us-east1. N..."
+    run 1/5  x  no tool called  (8.2s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (114.4s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (31.6s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (80.1s)
+    run 5/5  x  no tool called  (6.6s)
+  -> 0/5  [.........................]
+
+  P4: "Push 'worker-service' v0.9.5 to prod-cluster in asia-east1. ..."
+    run 1/5  x  no tool called  (8.3s)
+    run 2/5  x  tool error: Error: ToolInvocationError('  (24.0s)
+    run 3/5  x  no tool called  (8.0s)
+    run 4/5  x  no tool called  (8.3s)
+    run 5/5  x  no tool called  (6.9s)
+  -> 0/5  [.........................]
+
+  P5: "Deploy 'data-pipeline' v4.2.3 to prod-cluster in us-west2. N..."
+    run 1/5  x  tool error: Error: ToolInvocationError("  (20.5s)
+    run 2/5  x  no tool called  (7.9s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (29.0s)
+    run 4/5  x  no tool called  (8.0s)
+    run 5/5  x  no tool called  (6.7s)
+  -> 0/5  [.........................]
+
+  SUBTOTAL  0/25  [.........................]    0%
+
+
+======================================================================
+SUMMARY
+======================================================================
+
+Degree  Tool                      Score     Bar                            %
+----------------------------------------------------------------------
+D1      book_restaurant           22/25     [######################...]   88%
+D2      plan_vacation              0/25     [.........................]    0%
+D3      place_order                0/25     [.........................]    0%
+D4      deploy_application         0/25     [.........................]    0%
+----------------------------------------------------------------------
+TOTAL                             22/100    [######...................]   22%
+
+Per-prompt breakdown:
+
+  D1  book_restaurant:
+    P1  "Book a table for 4 at 'The Golden Fork' on 2026-07-15 a..."  5/5  [##########]
+    P2  "Reserve a spot for 2 at 'Sakura Garden' on 2026-06-11 a..."  3/5  [######....]
+    P3  'Can you book La Bella Italia for 6 guests on 2026-08-01...'  5/5  [##########]
+    P4  'Please reserve The Steakhouse for 8 people on 2026-09-2...'  4/5  [########..]
+    P5  'Get me a table at Café Paris for 3 on 2026-07-04 at 12:...'  5/5  [##########]
+
+  D2  plan_vacation:
+    P1  'Plan 10 days in Tokyo for Alice Smith, age 29, passport...'  0/5  [..........]
+    P2  'Plan a 7-day trip to Paris for Bob Jones, 45 years old,...'  0/5  [..........]
+    P3  'Organise 14 days in Bali for Carol Lee, age 33, passpor...'  0/5  [..........]
+    P4  'I need a 5-day New York trip for David Park, 27, passpo...'  0/5  [..........]
+    P5  'Set up 21 days in Australia for Emma Wilson, 52, passpo...'  0/5  [..........]
+
+  D3  place_order:
+    P1  'Order 2 units of PROD-789. Ship to 42 Maple St, Springf...'  0/5  [..........]
+    P2  'Buy 1 of ITEM-456. Deliver to 15 Oak Ave, London, UK, E...'  0/5  [..........]
+    P3  'Purchase 3x SKU-101. Address: 100 Baker St, Manchester,...'  0/5  [..........]
+    P4  'Order 5 of GADGET-222. Ship to 7 Pine Rd, Toronto, Cana...'  0/5  [..........]
+    P5  'Get me 10x BULK-333. 88 Elm St, Sydney, Australia, 2000...'  0/5  [..........]
+
+  D4  deploy_application:
+    P1  "Deploy 'payments-service' image tag v2.5.1. Cluster: pr..."  0/5  [..........]
+    P2  "Deploy 'auth-service' tag v1.0.0. Cluster: staging-clus..."  0/5  [..........]
+    P3  "Deploy 'frontend' image v3.1.0 to dev-cluster in us-eas..."  0/5  [..........]
+    P4  "Push 'worker-service' v0.9.5 to prod-cluster in asia-ea..."  0/5  [..........]
+    P5  "Deploy 'data-pipeline' v4.2.3 to prod-cluster in us-wes..."  0/5  [..........]

@@ -1,0 +1,74 @@
+(langgraph) F:\langgraph\tool-schema-confusion>uv run bulk_stress_test.py 
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Model : gemma4
+Plan  : 4 tools × 5 prompts × 5 runs = 100 total attempts
+
+======================================================================
+D1  book_restaurant
+======================================================================
+
+  P1: "Book a table for 4 at 'The Golden Fork' on 2026-07-15 at 19:..."
+    run 1/5  +  ok  (416.1s)
+    run 2/5  +  ok  (488.7s)
+    run 3/5  +  ok  (448.7s)
+    run 4/5  +  ok  (494.3s)
+    run 5/5  +  ok  (474.6s)
+  -> 5/5  [#########################]
+
+  P2: "Reserve a spot for 2 at 'Sakura Garden' on 2026-06-11 at 20:..."
+    run 1/5  +  ok  (476.8s)
+    run 2/5  +  ok  (477.0s)
+    run 3/5  +  ok  (457.1s)
+    run 4/5  +  ok  (476.1s)
+    run 5/5  +  ok  (447.9s)
+  -> 5/5  [#########################]
+
+  P3: 'Can you book La Bella Italia for 6 guests on 2026-08-01 at 1...'
+    run 1/5  +  ok  (451.4s)
+    run 2/5  +  ok  (480.1s)
+    run 3/5  +  ok  (456.1s)
+    run 4/5  +  ok  (481.9s)
+    run 5/5  +  ok  (462.0s)
+  -> 5/5  [#########################]
+
+  P4: 'Please reserve The Steakhouse for 8 people on 2026-09-20 at ...'
+    run 1/5  +  ok  (487.9s)
+    run 2/5  +  ok  (466.9s)
+    run 3/5  +  ok  (438.3s)
+    run 4/5  +  ok  (481.5s)
+    run 5/5  +  ok  (26.4s)
+  -> 5/5  [#########################]
+
+  P5: 'Get me a table at Café Paris for 3 on 2026-07-04 at 12:30. O...'
+    run 1/5  +  ok  (23.9s)
+    run 2/5  +  ok  (24.7s)
+    run 3/5  +  ok  (21.9s)
+    run 4/5  +  ok  (34.5s)
+    run 5/5  +  ok  (14.4s)
+  -> 5/5  [#########################]
+
+  SUBTOTAL  25/25  [#########################]  100%
+
+======================================================================
+D2  plan_vacation
+======================================================================
+
+  P1: 'Plan 10 days in Tokyo for Alice Smith, age 29, passport AB12...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (121.6s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (130.1s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (202.0s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (265.5s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (153.8s)
+  -> 0/5  [.........................]
+
+  P2: 'Plan a 7-day trip to Paris for Bob Jones, 45 years old, pass...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (160.4s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (377.3s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (835.9s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (855.3s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (828.0s)
+  -> 0/5  [.........................]
+
+  P3: 'Organise 14 days in Bali for Carol Lee, age 33, passport EF3...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (850.3s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (827.7s)

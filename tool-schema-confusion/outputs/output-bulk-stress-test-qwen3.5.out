@@ -1,0 +1,150 @@
+(langgraph) F:\langgraph\tool-schema-confusion>uv run bulk_stress_test.py                        
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Model : qwen3.5
+Plan  : 4 tools × 5 prompts × 5 runs = 100 total attempts
+
+======================================================================
+D1  book_restaurant
+======================================================================
+
+  P1: "Book a table for 4 at 'The Golden Fork' on 2026-07-15 at 19:..."
+    run 1/5  +  ok  (370.8s)
+    run 2/5  +  ok  (1155.2s)
+    run 3/5  +  ok  (543.8s)
+    run 4/5  +  ok  (574.1s)
+    run 5/5  +  ok  (570.2s)
+  -> 5/5  [#########################]
+
+  P2: "Reserve a spot for 2 at 'Sakura Garden' on 2026-06-11 at 20:..."
+    run 1/5  +  ok  (529.4s)
+    run 2/5  +  ok  (570.0s)
+    run 3/5  +  ok  (531.9s)
+    run 4/5  +  ok  (613.8s)
+    run 5/5  +  ok  (50.4s)
+  -> 5/5  [#########################]
+
+  P3: 'Can you book La Bella Italia for 6 guests on 2026-08-01 at 1...'
+    run 1/5  +  ok  (40.2s)
+    run 2/5  +  ok  (30.2s)
+    run 3/5  +  ok  (29.7s)
+    run 4/5  +  ok  (39.2s)
+    run 5/5  +  ok  (35.4s)
+  -> 5/5  [#########################]
+
+  P4: 'Please reserve The Steakhouse for 8 people on 2026-09-20 at ...'
+    run 1/5  +  ok  (42.4s)
+    run 2/5  +  ok  (29.4s)
+    run 3/5  +  ok  (30.4s)
+    run 4/5  +  ok  (28.3s)
+    run 5/5  +  ok  (30.1s)
+  -> 5/5  [#########################]
+
+  P5: 'Get me a table at Café Paris for 3 on 2026-07-04 at 12:30. O...'
+    run 1/5  +  ok  (47.8s)
+    run 2/5  +  ok  (31.1s)
+    run 3/5  +  ok  (38.9s)
+    run 4/5  +  ok  (35.1s)
+    run 5/5  +  ok  (31.9s)
+  -> 5/5  [#########################]
+
+  SUBTOTAL  25/25  [#########################]  100%
+
+======================================================================
+D2  plan_vacation
+======================================================================
+
+  P1: 'Plan 10 days in Tokyo for Alice Smith, age 29, passport AB12...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (85.7s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (85.4s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (91.6s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (97.3s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (86.6s)
+  -> 0/5  [.........................]
+
+  P2: 'Plan a 7-day trip to Paris for Bob Jones, 45 years old, pass...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (79.3s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (77.4s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (78.9s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (91.1s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (84.8s)
+  -> 0/5  [.........................]
+
+  P3: 'Organise 14 days in Bali for Carol Lee, age 33, passport EF3...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (95.0s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (114.5s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (89.2s)
+    run 4/5  +  ok  (78.7s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (91.5s)
+  -> 1/5  [#####....................]
+
+  P4: 'I need a 5-day New York trip for David Park, 27, passport GH...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (142.1s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (1648.4s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (91.1s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (82.7s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (131.5s)
+  -> 0/5  [.........................]
+
+  P5: 'Set up 21 days in Australia for Emma Wilson, 52, passport IJ...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (118.5s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (96.0s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (90.1s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (100.9s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (81.6s)
+  -> 0/5  [.........................]
+
+  SUBTOTAL  1/25  [#........................]    4%
+
+======================================================================
+D3  place_order
+======================================================================
+
+  P1: 'Order 2 units of PROD-789. Ship to 42 Maple St, Springfield,...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (200.8s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (105.1s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (172.1s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (136.5s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (109.5s)
+  -> 0/5  [.........................]
+
+  P2: 'Buy 1 of ITEM-456. Deliver to 15 Oak Ave, London, UK, EC1A 1...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (96.2s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (87.3s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (148.8s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (130.4s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (249.9s)
+  -> 0/5  [.........................]
+
+  P3: 'Purchase 3x SKU-101. Address: 100 Baker St, Manchester, UK, ...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (110.7s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (151.9s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (191.1s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (52.6s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (140.7s)
+  -> 0/5  [.........................]
+
+  P4: 'Order 5 of GADGET-222. Ship to 7 Pine Rd, Toronto, Canada, M...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (252.0s)
+    run 2/5  x  tool error: Error: ToolInvocationError('  (224.4s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (108.1s)
+    run 4/5  x  tool error: Error: ToolInvocationError('  (231.1s)
+    run 5/5  x  tool error: Error: ToolInvocationError('  (337.3s)
+  -> 0/5  [.........................]
+
+  P5: 'Get me 10x BULK-333. 88 Elm St, Sydney, Australia, 2000, exp...'
+    run 1/5  x  tool error: Error: ToolInvocationError("  (217.5s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (377.2s)
+    run 3/5  x  tool error: Error: ToolInvocationError("  (184.0s)
+    run 4/5  x  tool error: Error: ToolInvocationError("  (167.4s)
+    run 5/5  x  tool error: Error: ToolInvocationError("  (1637.0s)
+  -> 0/5  [.........................]
+
+  SUBTOTAL  0/25  [.........................]    0%
+
+======================================================================
+D4  deploy_application
+======================================================================
+
+  P1: "Deploy 'payments-service' image tag v2.5.1. Cluster: prod-cl..."
+    run 1/5  x  tool error: Error: ToolInvocationError("  (74.3s)
+    run 2/5  x  tool error: Error: ToolInvocationError("  (1152.3s)

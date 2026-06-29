@@ -1,0 +1,293 @@
+# ---------------------------------------------------------------------------
+# T1 — search_products  (catalog discovery by keyword)
+# ---------------------------------------------------------------------------
+def search_products(keywords: str) -> str:
+    """Search the product catalog by keyword to discover products to buy."""
+    return json.dumps([
+        {"id": "P1", "name": f"Match for '{keywords}' #1", "price_usd": 49},
+        {"id": "P2", "name": f"Match for '{keywords}' #2", "price_usd": 89},
+    ])
+
+
+# ---------------------------------------------------------------------------
+# T2 — find_stores  ("find" ≈ "search" in the dictionary, but the intent is
+#                     a physical store locator — completely different job)
+# ---------------------------------------------------------------------------
+def find_stores(city: str) -> str:
+    """Find physical retail store locations in a given city."""
+    return json.dumps([
+        {"store_id": "S1", "address": f"12 Main St, {city}", "open_until": "21:00"},
+        {"store_id": "S2", "address": f"450 Market Ave, {city}", "open_until": "20:00"},
+    ])
+
+
+# ---------------------------------------------------------------------------
+# T3 — lookup_warranty  ("look up" ≈ "search" in the dictionary, but the
+#                         intent is warranty status by serial number)
+# ---------------------------------------------------------------------------
+def lookup_warranty(serial_number: str) -> str:
+    """Look up the warranty coverage status of a purchased device by its serial number."""
+    return json.dumps({
+        "serial_number": serial_number,
+        "covered": True,
+        "expires": "2027-03-15",
+        "plan": "standard 2-year",
+    })
+
+
+# ---------------------------------------------------------------------------
+# T4 — track_order  ("track" ≈ "follow/locate" in the dictionary, but the
+#                     intent is shipping status by order ID)
+# ---------------------------------------------------------------------------
+def track_order(order_id: str) -> str:
+    """Track the shipping and delivery status of a customer order by its order ID."""
+    return json.dumps({
+        "order_id": order_id,
+        "status": "in_transit",
+        "estimated_delivery": "2026-06-14",
+        "carrier": "UPS",
+    })
+
+
+========================================================================
+tool_confusion_experiment  |  model=llama3.1:8b  runs/prompt=4
+========================================================================
+
+[1/3]  Computing similarity metrics...
+  TF-IDF... done
+  BERTScore... Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights: 100%|████████████████████████████████████████████████████████████████████████████████████| 389/389 [00:00<00:00, 810.42it/s]
+[transformers] RobertaModel LOAD REPORT from: roberta-large
+Key                       | Status     | 
+--------------------------+------------+-
+lm_head.bias              | UNEXPECTED | 
+lm_head.dense.bias        | UNEXPECTED | 
+lm_head.layer_norm.weight | UNEXPECTED | 
+lm_head.dense.weight      | UNEXPECTED | 
+lm_head.layer_norm.bias   | UNEXPECTED | 
+pooler.dense.weight       | MISSING    | 
+pooler.dense.bias         | MISSING    | 
+
+Notes:
+- UNEXPECTED:   can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+- MISSING:      those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+done
+  Word Mover's Distance...
+  Loading GloVe-100 vectors (first run ~128 MB)...
+Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████| 103/103 [00:00<00:00, 5242.82it/s]
+done
+  Ollama embeddings...   [Ollama] skipped — No working Ollama embed endpoint for model 'llama3.1:8b'.
+  Try:  ollama pull nomic-embed-text
+  Then: python tool_confusion_experiment.py --embed-model nomic-embed-text
+skipped
+
+========================================================================
+SIMILARITY MATRIX  (all 6 tool pairs × active metrics)
+========================================================================
+Pair                                        TF-IDF      BERTScore   WMD         SBERT     
+------------------------------------------------------------------------
+search_products  ↔  find_stores             0.0000      0.9002      0.5310      0.4737    
+search_products  ↔  lookup_warranty         0.1429      0.8869      0.5331      0.2375    
+search_products  ↔  track_order             0.1336      0.8884      0.5405      0.1934    
+find_stores  ↔  lookup_warranty             0.0000      0.8892      0.5221      0.1322    
+find_stores  ↔  track_order                 0.0000      0.8948      0.5325      0.1839    
+lookup_warranty  ↔  track_order             0.3341      0.9110      0.6007      0.2991    
+
+========================================================================
+[2/3]  Running experiments  (12 prompts × 4 runs = 48 total)
+========================================================================
+
+P01 [search_products]  'I want to buy a wireless mouse — what do you have?'
+    run 1/4  +  called 'search_products'             (14.8s)
+    run 2/4  +  called 'search_products'             (4.7s)
+    run 3/4  +  called 'search_products'             (4.2s)
+    run 4/4  +  called 'search_products'             (5.2s)
+
+P02 [search_products]  'Show me some noise-cancelling headphones I could order.'
+    run 1/4  +  called 'search_products'             (9.4s)
+    run 2/4  +  called 'search_products'             (9.6s)
+    run 3/4  +  called 'search_products'             (6.4s)
+    run 4/4  +  called 'search_products'             (7.7s)
+
+P03 [search_products]  "I'm shopping for a budget mechanical keyboard."
+    run 1/4  +  called 'search_products'             (9.0s)
+    run 2/4  +  called 'search_products'             (8.0s)
+    run 3/4  +  called 'search_products'             (9.6s)
+    run 4/4  +  called 'search_products'             (7.9s)
+
+P04 [find_stores]  'Is there a branch of yours in Chicago?'
+    run 1/4  +  called 'find_stores'                 (5.7s)
+    run 2/4  +  called 'find_stores'                 (4.9s)
+    run 3/4  +  called 'find_stores'                 (5.1s)
+    run 4/4  +  called 'find_stores'                 (4.4s)
+
+P05 [find_stores]  'Where can I visit you in person around Seattle?'
+    run 1/4  +  called 'find_stores'                 (6.0s)
+    run 2/4  +  called 'find_stores'                 (5.9s)
+    run 3/4  +  called 'find_stores'                 (3.9s)
+    run 4/4  +  called 'find_stores'                 (4.6s)
+
+P06 [find_stores]  "I'd like to walk into one of your shops in Boston — whe..."
+    run 1/4  +  called 'find_stores'                 (6.5s)
+    run 2/4  +  called 'find_stores'                 (4.6s)
+    run 3/4  +  called 'find_stores'                 (4.9s)
+    run 4/4  +  called 'find_stores'                 (4.2s)
+
+P07 [lookup_warranty]  "My laptop's serial number is SN-99887 — is it still cov..."
+    run 1/4  +  called 'lookup_warranty'             (5.5s)
+    run 2/4  +  called 'lookup_warranty'             (4.7s)
+    run 3/4  +  called 'lookup_warranty'             (5.2s)
+    run 4/4  +  called 'lookup_warranty'             (5.5s)
+
+P08 [lookup_warranty]  'I bought a blender last year, serial BL-1234. Am I cove...'
+    run 1/4  +  called 'lookup_warranty'             (7.6s)
+    run 2/4  +  called 'lookup_warranty'             (5.0s)
+    run 3/4  +  called 'lookup_warranty'             (6.2s)
+    run 4/4  +  called 'lookup_warranty'             (5.5s)
+
+P09 [lookup_warranty]  'Can you check coverage for my device with serial X5-004...'
+    run 1/4  +  called 'lookup_warranty'             (7.3s)
+    run 2/4  +  called 'lookup_warranty'             (3.7s)
+    run 3/4  +  called 'lookup_warranty'             (4.1s)
+    run 4/4  +  called 'lookup_warranty'             (5.6s)
+
+P10 [track_order]  'Order ORD-5522 — where is it right now?'
+    run 1/4  +  called 'track_order'                 (5.3s)
+    run 2/4  +  called 'track_order'                 (3.6s)
+    run 3/4  +  called 'track_order'                 (4.0s)
+    run 4/4  +  called 'track_order'                 (3.3s)
+
+P11 [track_order]  "My package from order ORD-1001 hasn't arrived. What's t..."
+    run 1/4  +  called 'track_order'                 (6.8s)
+    run 2/4  +  called 'track_order'                 (5.0s)
+    run 3/4  +  called 'track_order'                 (4.9s)
+    run 4/4  +  called 'track_order'                 (6.0s)
+
+P12 [track_order]  'When will order ORD-7733 be delivered?'
+    run 1/4  +  called 'track_order'                 (5.4s)
+    run 2/4  +  called 'track_order'                 (3.5s)
+    run 3/4  +  called 'track_order'                 (3.9s)
+    run 4/4  +  called 'track_order'                 (4.0s)
+
+========================================================================
+[3/3]  RESULTS SUMMARY
+========================================================================
+
+Per-tool accuracy:
+  search_products         12/12  [############]  100%
+  find_stores             12/12  [############]  100%
+  lookup_warranty         12/12  [############]  100%
+  track_order             12/12  [############]  100%
+
+  TOTAL                   48/48  [############]  100%
+
+------------------------------------------------------------------------
+Confusion rate per tool pair vs similarity scores:
+------------------------------------------------------------------------
+Pair                                        Confusion  TF-IDF      BERTScore   WMD         SBERT     
+------------------------------------------------------------------------
+search_products  ↔  find_stores                 0.0%  0.0000      0.9002      0.5310      0.4737    
+search_products  ↔  lookup_warranty             0.0%  0.1429      0.8869      0.5331      0.2375    
+search_products  ↔  track_order                 0.0%  0.1336      0.8884      0.5405      0.1934    
+find_stores  ↔  lookup_warranty                 0.0%  0.0000      0.8892      0.5221      0.1322    
+find_stores  ↔  track_order                     0.0%  0.0000      0.8948      0.5325      0.1839    
+lookup_warranty  ↔  track_order                 0.0%  0.3341      0.9110      0.6007      0.2991    
+
+========================================================================
+THRESHOLD ANALYSIS — at what similarity does confusion drop to zero?
+========================================================================
+(sorted by similarity score per metric; confusion% beside each pair)
+
+  Metric: TF-IDF
+    0.3341  lookup_warranty ↔ track_order                 confusion=0%
+    0.1429  search_products ↔ lookup_warranty             confusion=0%
+    0.1336  search_products ↔ track_order                 confusion=0%
+    0.0000  search_products ↔ find_stores                 confusion=0%
+    0.0000  find_stores ↔ lookup_warranty             confusion=0%
+    0.0000  find_stores ↔ track_order                 confusion=0%
+    => no confusion observed at any similarity level
+
+  Metric: BERTScore
+    0.9110  lookup_warranty ↔ track_order                 confusion=0%
+    0.9002  search_products ↔ find_stores                 confusion=0%
+    0.8948  find_stores ↔ track_order                 confusion=0%
+    0.8892  find_stores ↔ lookup_warranty             confusion=0%
+    0.8884  search_products ↔ track_order                 confusion=0%
+    0.8869  search_products ↔ lookup_warranty             confusion=0%
+    => no confusion observed at any similarity level
+
+  Metric: WMD
+    0.6007  lookup_warranty ↔ track_order                 confusion=0%
+    0.5405  search_products ↔ track_order                 confusion=0%
+    0.5331  search_products ↔ lookup_warranty             confusion=0%
+    0.5325  find_stores ↔ track_order                 confusion=0%
+    0.5310  search_products ↔ find_stores                 confusion=0%
+    0.5221  find_stores ↔ lookup_warranty             confusion=0%
+    => no confusion observed at any similarity level
+
+  Metric: SBERT
+    0.4737  search_products ↔ find_stores                 confusion=0%
+    0.2991  lookup_warranty ↔ track_order                 confusion=0%
+    0.2375  search_products ↔ lookup_warranty             confusion=0%
+    0.1934  search_products ↔ track_order                 confusion=0%
+    0.1839  find_stores ↔ track_order                 confusion=0%
+    0.1322  find_stores ↔ lookup_warranty             confusion=0%
+    => no confusion observed at any similarity level
+
+------------------------------------------------------------------------
+RAW RUN LOG
+------------------------------------------------------------------------
+#     prompt  run  ground_truth            called                  ok    reason
+------------------------------------------------------------------------
+1     P1    R1   search_products         search_products         +     ok
+2     P1    R2   search_products         search_products         +     ok
+3     P1    R3   search_products         search_products         +     ok
+4     P1    R4   search_products         search_products         +     ok
+5     P2    R1   search_products         search_products         +     ok
+6     P2    R2   search_products         search_products         +     ok
+7     P2    R3   search_products         search_products         +     ok
+8     P2    R4   search_products         search_products         +     ok
+9     P3    R1   search_products         search_products         +     ok
+10    P3    R2   search_products         search_products         +     ok
+11    P3    R3   search_products         search_products         +     ok
+12    P3    R4   search_products         search_products         +     ok
+13    P4    R1   find_stores             find_stores             +     ok
+14    P4    R2   find_stores             find_stores             +     ok
+15    P4    R3   find_stores             find_stores             +     ok
+16    P4    R4   find_stores             find_stores             +     ok
+17    P5    R1   find_stores             find_stores             +     ok
+18    P5    R2   find_stores             find_stores             +     ok
+19    P5    R3   find_stores             find_stores             +     ok
+20    P5    R4   find_stores             find_stores             +     ok
+21    P6    R1   find_stores             find_stores             +     ok
+22    P6    R2   find_stores             find_stores             +     ok
+23    P6    R3   find_stores             find_stores             +     ok
+24    P6    R4   find_stores             find_stores             +     ok
+25    P7    R1   lookup_warranty         lookup_warranty         +     ok
+26    P7    R2   lookup_warranty         lookup_warranty         +     ok
+27    P7    R3   lookup_warranty         lookup_warranty         +     ok
+28    P7    R4   lookup_warranty         lookup_warranty         +     ok
+29    P8    R1   lookup_warranty         lookup_warranty         +     ok
+30    P8    R2   lookup_warranty         lookup_warranty         +     ok
+31    P8    R3   lookup_warranty         lookup_warranty         +     ok
+32    P8    R4   lookup_warranty         lookup_warranty         +     ok
+33    P9    R1   lookup_warranty         lookup_warranty         +     ok
+34    P9    R2   lookup_warranty         lookup_warranty         +     ok
+35    P9    R3   lookup_warranty         lookup_warranty         +     ok
+36    P9    R4   lookup_warranty         lookup_warranty         +     ok
+37    P10   R1   track_order             track_order             +     ok
+38    P10   R2   track_order             track_order             +     ok
+39    P10   R3   track_order             track_order             +     ok
+40    P10   R4   track_order             track_order             +     ok
+41    P11   R1   track_order             track_order             +     ok
+42    P11   R2   track_order             track_order             +     ok
+43    P11   R3   track_order             track_order             +     ok
+44    P11   R4   track_order             track_order             +     ok
+45    P12   R1   track_order             track_order             +     ok
+46    P12   R2   track_order             track_order             +     ok
+47    P12   R3   track_order             track_order             +     ok
+48    P12   R4   track_order             track_order             +     ok
+
+========================================================================
+Experiment complete.
+========================================================================
