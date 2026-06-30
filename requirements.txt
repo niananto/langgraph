@@ -16,3 +16,4 @@ bert-score
 gensim
 POT
 sentence-transformers
+torch

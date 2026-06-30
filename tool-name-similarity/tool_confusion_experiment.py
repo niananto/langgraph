@@ -34,27 +34,30 @@ description difference doesn't confuse it, that is the result.
 15 prompts (3 per tool, ground-truth labelled but tool name never mentioned).
 4 runs per prompt = 60 total runs.
 
-6 similarity metrics computed once upfront for all 6 tool pairs:
-  1. Cosine (bag-of-words)   (sklearn CountVectorizer — raw word-count cosine)
-  2. TF-IDF cosine           (sklearn, use_idf=False — TF cosine)
-  3. BERTScore F1            (bert-score, ~500 MB download first run)
-  4. Word Mover's Distance   (gensim + GloVe-100, ~128 MB download first run)
-  5. Sentence-BERT cosine    (sentence-transformers, ~80 MB download first run)
-  6. Ollama embedding cosine (/api/embed — same model that routes the calls)
+5 similarity metrics computed once upfront for all tool pairs. They split into
+LEXICAL (surface word overlap), STATIC embeddings, and CONTEXTUAL embeddings:
+  1. BoW-Cos    (sklearn CountVectorizer — raw word-count cosine)      LEXICAL
+  2. BERTScore  (bert-score, RoBERTa token matching, ~500 MB 1st run)  contextual (RoBERTa)
+  3. WMD        (gensim + GloVe-100, ~128 MB 1st run)                   STATIC word vectors
+  4. SBERT      (sentence-transformers MiniLM, ~80 MB 1st run)         contextual (MiniLM)
+  5. Llama-Ctx  (transformers, full Llama 3.1 8B, ~16 GB 1st run)      contextual (Llama itself)
+
+Llama-Ctx is the faithful match to the routing model's internal similarity:
+the same network embeds the tool-description text via all 32 layers, mean-pooled.
+It is the contextual counterpart to the raw embed_tokens lookup in
+tool_name_embeddings.py (which reads layer-0 vectors only, no transformer applied).
 
 Headline output: for each metric, the similarity threshold below which
 confusion dropped to zero — the "safe separation" for tool naming.
 
 Run:
     python tool_confusion_experiment.py
-    python tool_confusion_experiment.py --no-bert --no-wmd        # skip large downloads
-    python tool_confusion_experiment.py --model llama3.2:3b       # different chat model
-    python tool_confusion_experiment.py --embed-model nomic-embed-text  # dedicated embed model
-    python tool_confusion_experiment.py --runs 2                  # faster smoke-test
+    python tool_confusion_experiment.py --no-bert --no-wmd --no-llama-ctx  # skip big downloads
+    python tool_confusion_experiment.py --model llama3.2:3b                # different chat model
+    python tool_confusion_experiment.py --runs 2                           # faster smoke-test
 
-If Ollama returns 501 for /api/embed, pull a dedicated embedding model:
-    ollama pull nomic-embed-text
-    python tool_confusion_experiment.py --embed-model nomic-embed-text
+Llama-Ctx needs an HF token (HF_TOKEN in .env) for the gated meta-llama repo;
+without one it falls back to the public NousResearch/Meta-Llama-3.1-8B mirror.
 """
 
 from __future__ import annotations
@@ -69,7 +72,6 @@ from itertools import combinations
 from typing import Annotated
 
 import numpy as np
-import requests
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, StateGraph
@@ -84,12 +86,11 @@ if hasattr(sys.stdout, "reconfigure"):
 # CLI flags
 # ---------------------------------------------------------------------------
 _argv = sys.argv[1:]
-SKIP_BERT = "--no-bert" in _argv
-SKIP_WMD  = "--no-wmd"  in _argv
-MODEL       = next((_argv[i + 1] for i, a in enumerate(_argv) if a == "--model"),       "llama3.1:8b")
-EMBED_MODEL = next((_argv[i + 1] for i, a in enumerate(_argv) if a == "--embed-model"), MODEL)
-RUNS        = int(next((_argv[i + 1] for i, a in enumerate(_argv) if a == "--runs"),    4))
-OLLAMA_BASE = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+SKIP_BERT      = "--no-bert"      in _argv
+SKIP_WMD       = "--no-wmd"       in _argv
+SKIP_LLAMA_CTX = "--no-llama-ctx" in _argv
+MODEL = next((_argv[i + 1] for i, a in enumerate(_argv) if a == "--model"), "llama3.1:8b")
+RUNS  = int(next((_argv[i + 1] for i, a in enumerate(_argv) if a == "--runs"), 4))
 
 SEP  = "=" * 72
 SEP2 = "-" * 72
@@ -308,24 +309,6 @@ def cosine_similarities() -> dict[tuple, float]:
     return sims
 
 
-def tfidf_similarities() -> dict[tuple, float]:
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.metrics.pairwise import cosine_similarity as sk_cos
-
-    docs = [TOOL_TEXTS[n] for n in TOOL_NAMES]
-    # use_idf=False: removes the inverse-document-frequency weighting.
-    # With only 4 documents, IDF aggressively penalizes shared terms and
-    # collapses all pair scores to near-zero. Plain TF cosine gives a
-    # meaningful spread where shared vocabulary actually raises similarity.
-    mat  = TfidfVectorizer(use_idf=False).fit_transform(docs).toarray()
-    sims = {}
-    for a, b in TOOL_PAIRS:
-        va = mat[TOOL_NAMES.index(a)]
-        vb = mat[TOOL_NAMES.index(b)]
-        sims[(a, b)] = float(sk_cos([va], [vb])[0][0])
-    return sims
-
-
 def bert_similarities() -> dict[tuple, float] | None:
     if SKIP_BERT:
         return None
@@ -389,44 +372,47 @@ def sbert_similarities() -> dict[tuple, float] | None:
         return None
 
 
-def _ollama_embed_one(text: str) -> np.ndarray:
-    """Try known Ollama embed formats in order of most-likely-to-work.
+def llama_contextual_similarities() -> dict[tuple, float] | None:
+    """Contextual cosine from the routing model's OWN hidden states.
 
-    String input  ("/api/embed", input=str)  — works on 0.30.x and confirmed
-    by tool_name_embeddings.py.  Array input and the legacy /api/embeddings
-    endpoint are kept as fallbacks for other versions.
+    Loads the full Llama 3.1 8B model (all 32 transformer layers, unlike the
+    raw embed_tokens-only lookup in tool_name_embeddings.py) and mean-pools the
+    final-layer hidden states into one vector per tool description. This is the
+    faithful counterpart to the model's internal similarity — the same network
+    that does the tool routing, embedding the same tool-description text.
+
+    Heavy: ~16 GB download on first run (cached afterwards) and a CPU forward
+    pass per description. Skip with --no-llama-ctx.
     """
-    candidates = [
-        ("/api/embed",       {"model": EMBED_MODEL, "input": text},    "embeddings"),
-        ("/api/embed",       {"model": EMBED_MODEL, "input": [text]},  "embeddings"),
-        ("/api/embeddings",  {"model": EMBED_MODEL, "prompt": text},   "embedding"),
-    ]
-    for endpoint, payload, result_key in candidates:
-        try:
-            resp = requests.post(
-                f"{OLLAMA_BASE}{endpoint}", json=payload, timeout=300
-            )
-            if resp.status_code in (404, 501):
-                continue
-            resp.raise_for_status()
-            vec = resp.json()[result_key]
-            if isinstance(vec[0], list):   # /api/embed wraps in outer list
-                vec = vec[0]
-            return np.array(vec, dtype=np.float32)
-        except (requests.HTTPError, KeyError, IndexError):
-            continue
-    raise RuntimeError(
-        f"No working Ollama embed endpoint for model '{EMBED_MODEL}'.\n"
-        "  Try:  ollama pull nomic-embed-text\n"
-        "  Then: python tool_confusion_experiment.py --embed-model nomic-embed-text"
-    )
-
-
-def ollama_similarities() -> dict[tuple, float] | None:
+    if SKIP_LLAMA_CTX:
+        print("  (--no-llama-ctx passed: skipping Llama contextual embeddings)")
+        return None
     try:
+        import torch
+        from transformers import AutoModel, AutoTokenizer
+
+        # same HF-token + public-mirror fallback as tool_name_embeddings.py
+        hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN")
+        model_id = "meta-llama/Meta-Llama-3.1-8B" if hf_token else "NousResearch/Meta-Llama-3.1-8B"
+
+        print(f"  Model: {model_id} (full model — ~16 GB first run)")
+        tok = AutoTokenizer.from_pretrained(model_id, token=hf_token)
+        model = AutoModel.from_pretrained(
+            model_id,
+            token=hf_token,
+            torch_dtype=torch.float16,
+            low_cpu_mem_usage=True,
+            device_map="cpu",
+        ).eval()
+
         vecs = {}
         for name in TOOL_NAMES:
-            vecs[name] = _ollama_embed_one(TOOL_TEXTS[name])
+            inputs = tok(TOOL_TEXTS[name], return_tensors="pt")
+            with torch.no_grad():
+                out = model(**inputs)
+            # mean-pool final hidden states over the token sequence
+            hidden = out.last_hidden_state[0]            # [seq_len, hidden]
+            vecs[name] = hidden.mean(dim=0).float().numpy()
 
         sims = {}
         for a, b in TOOL_PAIRS:
@@ -436,7 +422,7 @@ def ollama_similarities() -> dict[tuple, float] | None:
             )
         return sims
     except Exception as exc:
-        print(f"  [Ollama] skipped — {exc}")
+        print(f"  [Llama-Ctx] skipped — {exc}")
         return None
 
 
@@ -479,12 +465,8 @@ def main() -> None:
     print("\n[1/3]  Computing similarity metrics...")
     metrics: dict[str, dict[tuple, float] | None] = {}
 
-    print("  Cosine (bag-of-words)...", end=" ", flush=True)
-    metrics["Cosine"] = cosine_similarities()
-    print("done")
-
-    print("  TF-IDF...", end=" ", flush=True)
-    metrics["TF-IDF"] = tfidf_similarities()
+    print("  BoW-Cos (bag-of-words cosine)...", end=" ", flush=True)
+    metrics["BoW-Cos"] = cosine_similarities()
     print("done")
 
     print("  BERTScore...", end=" ", flush=True)
@@ -498,15 +480,15 @@ def main() -> None:
     metrics["SBERT"] = sbert_similarities()
     print("done" if metrics["SBERT"] else "skipped")
 
-    print("  Ollama embeddings...", end=" ", flush=True)
-    metrics["Ollama"] = ollama_similarities()
-    print("done" if metrics["Ollama"] else "skipped")
+    print("  Llama 3.1 contextual (transformers)...")
+    metrics["Llama-Ctx"] = llama_contextual_similarities()
+    print("  Llama-Ctx done" if metrics["Llama-Ctx"] else "  Llama-Ctx skipped")
 
     active_metrics = {k: v for k, v in metrics.items() if v is not None}
 
     # ── Print similarity matrix ───────────────────────────────────────────
     print(f"\n{SEP}")
-    print("SIMILARITY MATRIX  (all 6 tool pairs × active metrics)")
+    print(f"SIMILARITY MATRIX  (all {len(TOOL_PAIRS)} tool pairs × active metrics)")
     print(SEP)
     header = f"{'Pair':<42}" + "".join(f"  {k:<10}" for k in active_metrics)
     print(header)
