@@ -397,12 +397,14 @@ def llama_contextual_similarities() -> dict[tuple, float] | None:
 
         print(f"  Model: {model_id} (full model — ~16 GB first run)")
         tok = AutoTokenizer.from_pretrained(model_id, token=hf_token)
+        # No device_map / low_cpu_mem_usage: those require the `accelerate`
+        # package. Without them the model loads on CPU by default.
+        # bfloat16 (not float16): CPU has no float16 matmul kernels, so a
+        # float16 forward pass raises "not implemented for 'Half'"; bf16 works.
         model = AutoModel.from_pretrained(
             model_id,
             token=hf_token,
-            torch_dtype=torch.float16,
-            low_cpu_mem_usage=True,
-            device_map="cpu",
+            dtype=torch.bfloat16,
         ).eval()
 
         vecs = {}
