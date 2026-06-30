@@ -5,24 +5,26 @@ v3 — similarity LADDER design.  Earlier versions established the endpoints:
   v1: same intent + same `query` arg            → SBERT 0.73, 38% confusion
   v2: dictionary-synonym names, distinct intent → SBERT max 0.47, ~no confusion
 
-v3 deliberately spans the zones in between.  4 tools, all defensibly distinct
-in real life (different argument types, different jobs), but with description
-vocabulary engineered to hit SBERT similarity targets:
+v4 spans the zones with 5 tools, all defensibly distinct in real life but
+with description vocabulary engineered to hit SBERT similarity targets:
 
-  T1  search_products(keywords)        — keyword discovery
+  T1  search_products(keywords)        — list items matching a keyword
   T2  check_stock(product_name)        — availability of a KNOWN product
                                           target vs T1: SBERT > 0.7
   T3  list_category_products(category) — category browsing
                                           target vs T1/T2: SBERT 0.5–0.7
   T4  track_order(order_id)            — shipping status (low anchor < 0.35)
+  T5  recommend_products(need)         — near-PARAPHRASE of T1's description
+                                          target vs T1: SBERT > 0.8
 
-The T1/T2 boundary is the interesting one: "I want a wireless mouse" (discover)
-vs "Is the MX Master 3S in stock?" (check availability).  A human never
-confuses these.  The question is at what description-similarity the model does.
+The T1/T5 boundary is the headline: both "search the catalog for products to
+buy", differing only in list-matches (T1) vs recommend-the-best (T5).  Their
+prompts use the same products and differ only on "what do you have" vs
+"what's best" — the sharpest test yet of whether near-identical descriptions
+cause routing confusion.
 
-12 prompts (3 per tool, ground-truth labelled but tool name never mentioned;
-each prompt carries the identifier its tool needs, so correct routing can
-never fail on missing arguments).  4 runs per prompt = 48 total runs.
+15 prompts (3 per tool, ground-truth labelled but tool name never mentioned).
+4 runs per prompt = 60 total runs.
 
 6 similarity metrics computed once upfront for all 6 tool pairs:
   1. Cosine (bag-of-words)   (sklearn CountVectorizer — raw word-count cosine)
@@ -140,22 +142,40 @@ def track_order(order_id: str) -> str:
     })
 
 
-TOOLS = [search_products, check_stock, list_category_products, track_order]
+# ---------------------------------------------------------------------------
+# T5 — recommend_products  (near-PARAPHRASE of T1's description — engineered
+#                           for the highest SBERT pair in the set, target >0.8.
+#                           Defensible distinction: T1 lists items that MATCH a
+#                           keyword; T5 recommends the single BEST one for a
+#                           need. Same domain, same objects, near-identical
+#                           wording — the question is whether the model can
+#                           route on "what do you have" vs "what's best".)
+# ---------------------------------------------------------------------------
+def recommend_products(need: str) -> str:
+    """Search the store's product catalog to recommend the best product a customer can buy for their need."""
+    return json.dumps({
+        "recommended": {"id": "R1", "name": f"Best pick for '{need}'", "price_usd": 129},
+        "why": "highest rated within budget",
+    })
+
+
+TOOLS = [search_products, check_stock, list_category_products, track_order, recommend_products]
 TOOL_NAMES = [t.__name__ for t in TOOLS]
 
 
 # ---------------------------------------------------------------------------
-# 12 prompts — ground truth labelled, tool name never mentioned.
-# T1 prompts = vague discovery (user doesn't know the exact product).
-# T2 prompts = user names an EXACT product and asks about availability.
-# The human-obvious distinction is discovery vs availability; whether the
-# model preserves it under high description similarity is the experiment.
+# 15 prompts — ground truth labelled, tool name never mentioned.
+# T1 (search) and T5 (recommend) prompts use the SAME products and differ only
+# on a subtle signal: "what do you have / show me what exists" (list matches)
+# vs "what's best / what would you recommend" (recommend one). This isolates
+# the search↔recommend axis — the highest-SBERT pair in the set.
+# T2 prompts name an EXACT product + availability keyword (strong signal).
 # ---------------------------------------------------------------------------
 PROMPTS: list[dict] = [
-    # ── T1: search_products  (discovery intent, no specific product) ──────
+    # ── T1: search_products  (list matching items — "what do you have") ───
     {"tool": "search_products",        "text": "I want to buy a wireless mouse — what do you have?"},
-    {"tool": "search_products",        "text": "Show me some options for noise-cancelling headphones."},
-    {"tool": "search_products",        "text": "I'm shopping for a budget mechanical keyboard, any suggestions?"},
+    {"tool": "search_products",        "text": "Do you sell noise-cancelling headphones? Show me what there is."},
+    {"tool": "search_products",        "text": "I need a mechanical keyboard. What options exist in the catalog?"},
     # ── T2: check_stock  (exact product named, availability intent) ───────
     {"tool": "check_stock",            "text": "Is the Logitech MX Master 3S in stock right now?"},
     {"tool": "check_stock",            "text": "Do you currently have the Sony WH-1000XM5 available?"},
@@ -168,6 +188,10 @@ PROMPTS: list[dict] = [
     {"tool": "track_order",            "text": "Order ORD-5522 — where is it right now?"},
     {"tool": "track_order",            "text": "My package from order ORD-1001 hasn't arrived. What's the status?"},
     {"tool": "track_order",            "text": "When will order ORD-7733 be delivered?"},
+    # ── T5: recommend_products  (recommend the BEST — "what's best") ──────
+    {"tool": "recommend_products",     "text": "What's the best wireless mouse you'd recommend?"},
+    {"tool": "recommend_products",     "text": "Which noise-cancelling headphones would you suggest for travel?"},
+    {"tool": "recommend_products",     "text": "Can you recommend a good budget mechanical keyboard for me?"},
 ]
 
 SYSTEM_PROMPT = (
