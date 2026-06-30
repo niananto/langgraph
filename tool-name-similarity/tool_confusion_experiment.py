@@ -17,11 +17,20 @@ with description vocabulary engineered to hit SBERT similarity targets:
   T5  recommend_products(need)         — near-PARAPHRASE of T1's description
                                           target vs T1: SBERT > 0.8
 
-The T1/T5 boundary is the headline: both "search the catalog for products to
-buy", differing only in list-matches (T1) vs recommend-the-best (T5).  Their
-prompts use the same products and differ only on "what do you have" vs
-"what's best" — the sharpest test yet of whether near-identical descriptions
-cause routing confusion.
+v5 maximizes lexical overlap (v4 routed 100% even at SBERT 0.74 — the model
+was routing on prompt intent verbs, not description similarity). All four
+product tools now share the stem "In the store's product catalog, ... the
+customer can buy", and recommend_products is a strict SUPERSET of
+search_products' wording (identical text + ", and recommend the single best
+one"). This drives Cosine/TF-IDF/WMD up from the v4 lows and pushes the
+search<->recommend SBERT toward ~0.85+.
+
+The T1/T5 boundary is the headline: near-identical descriptions, differing
+only in list-matches (T1) vs recommend-the-best (T5). Prompts stay clearly
+distinct ("what do you have" vs "what's best") so ground truth holds. If the
+model STILL routes cleanly, the finding is strong: routing follows the
+prompt's intent, not description similarity. The remaining lever would be
+neutralizing the prompts — at the cost of a defensible ground truth.
 
 15 prompts (3 per tool, ground-truth labelled but tool name never mentioned).
 4 runs per prompt = 60 total runs.
@@ -91,7 +100,7 @@ SEP2 = "-" * 72
 # T1 — search_products  (catalog discovery by keyword)
 # ---------------------------------------------------------------------------
 def search_products(keywords: str) -> str:
-    """Search the store's product catalog by keyword to discover products customers can buy."""
+    """In the store's product catalog, search for products that match the customer's request so the customer can buy them."""
     return json.dumps([
         {"id": "P1", "name": f"Match for '{keywords}' #1", "price_usd": 49},
         {"id": "P2", "name": f"Match for '{keywords}' #2", "price_usd": 89},
@@ -105,7 +114,7 @@ def search_products(keywords: str) -> str:
 #                    target: SBERT > 0.7 vs T1
 # ---------------------------------------------------------------------------
 def check_stock(product_name: str) -> str:
-    """Check whether a specific product in the store catalog is currently in stock for customers to buy."""
+    """In the store's product catalog, check whether a specific product is currently in stock so the customer can buy it."""
     return json.dumps({
         "product_name": product_name,
         "in_stock": True,
@@ -120,7 +129,7 @@ def check_stock(product_name: str) -> str:
 #                               target: SBERT 0.5–0.7 vs T1 and T2
 # ---------------------------------------------------------------------------
 def list_category_products(category: str) -> str:
-    """List all products the store carries within a given product category."""
+    """In the store's product catalog, list all the products available within a given category so the customer can buy them."""
     return json.dumps([
         {"id": "C1", "category": category, "name": "Product A", "price_usd": 120},
         {"id": "C2", "category": category, "name": "Product B", "price_usd": 250},
@@ -152,7 +161,7 @@ def track_order(order_id: str) -> str:
 #                           route on "what do you have" vs "what's best".)
 # ---------------------------------------------------------------------------
 def recommend_products(need: str) -> str:
-    """Search the store's product catalog to recommend the best product a customer can buy for their need."""
+    """In the store's product catalog, search for products that match the customer's request so the customer can buy them, and recommend the single best one."""
     return json.dumps({
         "recommended": {"id": "R1", "name": f"Best pick for '{need}'", "price_usd": 129},
         "why": "highest rated within budget",
