@@ -17,22 +17,32 @@ with description vocabulary engineered to hit SBERT similarity targets:
   T5  recommend_products(need)         — near-PARAPHRASE of T1's description
                                           target vs T1: SBERT > 0.8
 
-v6 pushes the four product tools to a near-identical template:
-  "In the store's product catalog, {VERB} the product(s) that match the
-   customer's {request|category} so the customer can buy {them|it}..."
-search_products and recommend_products now differ by EXACTLY ONE body word
-(search for / recommend) plus the tool name — about as similar as two named
-tools can be while staying distinct. Their Cosine/TF-IDF should clear ~0.9
-and SBERT ~0.85+. check_stock and list_category share the same stem so the
-whole product-tool block sits high; only track_order stays low.
+KEY FINDING (v6 run): confusion tracked Llama's OWN contextual geometry, not
+surface words. The only confused pair (search ↔ list_category, 12.5%) was the
+#1-ranked pair under Llama-Ctx (0.8992) — beating search ↔ recommend (0.8937)
+— even though every lexical metric (BoW 0.93, BERTScore 0.98, WMD 0.88) rated
+search ↔ recommend as most similar and it never confused. So the router
+conflates tools its own embedding places closest, not the lexically closest.
 
-The headline is unchanged from v4/v5: across the whole similarity ladder the
-model has routed almost perfectly, confusion tracking PROMPT phrasing far
-more than description similarity. v6 is the extreme test — if even a one-word
-description difference doesn't confuse it, that is the result.
+v7 leans into that: a LISTING CLUSTER of tools that all perform the SAME
+operation — "return a filtered list of products" — differing only in the
+filter dimension. These should sit very high in Llama-Ctx and confuse most:
+  T1  search_products(keywords)          — filter by keyword
+  T3  list_category_products(category)   — filter by category/section
+  T5  recommend_products(need)           — filter + pick best
+  T6  list_brand_products(brand)         — filter by brand
+  T7  filter_products_by_price(max_price)— filter by budget
+plus two anchors that should stay distinct:
+  T2  check_stock(product_name)  — single named product's availability
+  T4  track_order(order_id)      — shipping status (low-similarity anchor)
 
-15 prompts (3 per tool, ground-truth labelled but tool name never mentioned).
-4 runs per prompt = 60 total runs.
+Prompts naturally bleed across the cluster: a brand name ("show me Logitech")
+reads as a keyword search; a category word reads as a keyword; a price prompt
+overlaps nothing lexically but shares the "list products" intent. Ground truth
+is the dimension the prompt names (brand→brand, category→category, budget→price).
+
+21 prompts (3 per tool, ground-truth labelled but tool name never mentioned).
+4 runs per prompt = 84 total runs.
 
 5 similarity metrics computed once upfront for all tool pairs. They split into
 LEXICAL (surface word overlap), STATIC embeddings, and CONTEXTUAL embeddings:
@@ -171,7 +181,45 @@ def recommend_products(need: str) -> str:
     })
 
 
-TOOLS = [search_products, check_stock, list_category_products, track_order, recommend_products]
+# ---------------------------------------------------------------------------
+# T6 — list_brand_products  (LISTING CLUSTER: same operation as search /
+#                            list_category / recommend — "return a filtered
+#                            list of products" — differing only in the filter
+#                            dimension (brand). Llama's contextual embedding
+#                            should rate the whole listing cluster very high;
+#                            brand names in prompts also bleed toward
+#                            check_stock, which names products.)
+# ---------------------------------------------------------------------------
+def list_brand_products(brand: str) -> str:
+    """In the store's product catalog, list the products that match the customer's preferred brand so the customer can buy them."""
+    return json.dumps([
+        {"id": "B1", "brand": brand, "name": f"{brand} item #1", "price_usd": 60},
+        {"id": "B2", "brand": brand, "name": f"{brand} item #2", "price_usd": 140},
+    ])
+
+
+# ---------------------------------------------------------------------------
+# T7 — filter_products_by_price  (LISTING CLUSTER member: filter by budget.
+#                                 Same "return a filtered product list"
+#                                 operation as the other listing tools.)
+# ---------------------------------------------------------------------------
+def filter_products_by_price(max_price: int) -> str:
+    """In the store's product catalog, list the products that match the customer's price budget so the customer can buy them."""
+    return json.dumps([
+        {"id": "F1", "name": "Budget item A", "price_usd": min(max_price, 25)},
+        {"id": "F2", "name": "Budget item B", "price_usd": min(max_price, 40)},
+    ])
+
+
+TOOLS = [
+    search_products,
+    check_stock,
+    list_category_products,
+    track_order,
+    recommend_products,
+    list_brand_products,
+    filter_products_by_price,
+]
 TOOL_NAMES = [t.__name__ for t in TOOLS]
 
 
@@ -184,26 +232,34 @@ TOOL_NAMES = [t.__name__ for t in TOOLS]
 # T2 prompts name an EXACT product + availability keyword (strong signal).
 # ---------------------------------------------------------------------------
 PROMPTS: list[dict] = [
-    # ── T1: search_products  (list matching items — "what do you have") ───
-    {"tool": "search_products",        "text": "I want to buy a wireless mouse — what do you have?"},
-    {"tool": "search_products",        "text": "Do you sell noise-cancelling headphones? Show me what there is."},
-    {"tool": "search_products",        "text": "I need a mechanical keyboard. What options exist in the catalog?"},
-    # ── T2: check_stock  (exact product named, availability intent) ───────
-    {"tool": "check_stock",            "text": "Is the Logitech MX Master 3S in stock right now?"},
-    {"tool": "check_stock",            "text": "Do you currently have the Sony WH-1000XM5 available?"},
-    {"tool": "check_stock",            "text": "Can I get a Keychron K2 today, or is it sold out?"},
-    # ── T3: list_category_products  (category exploration intent) ─────────
-    {"tool": "list_category_products", "text": "What's in your laptop section?"},
-    {"tool": "list_category_products", "text": "Show me everything you carry under home office furniture."},
-    {"tool": "list_category_products", "text": "List what you have in the audio accessories category."},
-    # ── T4: track_order  (shipping status intent) ─────────────────────────
-    {"tool": "track_order",            "text": "Order ORD-5522 — where is it right now?"},
-    {"tool": "track_order",            "text": "My package from order ORD-1001 hasn't arrived. What's the status?"},
-    {"tool": "track_order",            "text": "When will order ORD-7733 be delivered?"},
+    # ── T1: search_products  (generic keyword — no brand/category/price/budget) ─
+    {"tool": "search_products",         "text": "I want to buy a wireless mouse — what do you have?"},
+    {"tool": "search_products",         "text": "Do you sell noise-cancelling headphones? Show me what there is."},
+    {"tool": "search_products",         "text": "I need a mechanical keyboard. What options exist in the catalog?"},
+    # ── T2: check_stock  (exact product named + availability) ─────────────
+    {"tool": "check_stock",             "text": "Is the Logitech MX Master 3S in stock right now?"},
+    {"tool": "check_stock",             "text": "Do you currently have the Sony WH-1000XM5 available?"},
+    {"tool": "check_stock",             "text": "Can I get a Keychron K2 today, or is it sold out?"},
+    # ── T3: list_category_products  (explicit section/department) ─────────
+    {"tool": "list_category_products",  "text": "What's in your laptop section?"},
+    {"tool": "list_category_products",  "text": "Show me everything in the home office department."},
+    {"tool": "list_category_products",  "text": "Browse the audio accessories category for me."},
+    # ── T4: track_order  (shipping status) ────────────────────────────────
+    {"tool": "track_order",             "text": "Order ORD-5522 — where is it right now?"},
+    {"tool": "track_order",             "text": "My package from order ORD-1001 hasn't arrived. What's the status?"},
+    {"tool": "track_order",             "text": "When will order ORD-7733 be delivered?"},
     # ── T5: recommend_products  (recommend the BEST — "what's best") ──────
-    {"tool": "recommend_products",     "text": "What's the best wireless mouse you'd recommend?"},
-    {"tool": "recommend_products",     "text": "Which noise-cancelling headphones would you suggest for travel?"},
-    {"tool": "recommend_products",     "text": "Can you recommend a good budget mechanical keyboard for me?"},
+    {"tool": "recommend_products",      "text": "What's the best wireless mouse you'd recommend?"},
+    {"tool": "recommend_products",      "text": "Which noise-cancelling headphones would you suggest for travel?"},
+    {"tool": "recommend_products",      "text": "Can you recommend a good budget mechanical keyboard for me?"},
+    # ── T6: list_brand_products  (explicit brand name) ────────────────────
+    {"tool": "list_brand_products",     "text": "Show me everything Logitech makes."},
+    {"tool": "list_brand_products",     "text": "What Sony products do you carry?"},
+    {"tool": "list_brand_products",     "text": "List all the Anker items you stock."},
+    # ── T7: filter_products_by_price  (explicit budget/price ceiling) ─────
+    {"tool": "filter_products_by_price","text": "What do you have for under 50 dollars?"},
+    {"tool": "filter_products_by_price","text": "Show me anything cheaper than 100 dollars."},
+    {"tool": "filter_products_by_price","text": "List products that fit a 30 dollar budget."},
 ]
 
 SYSTEM_PROMPT = (
