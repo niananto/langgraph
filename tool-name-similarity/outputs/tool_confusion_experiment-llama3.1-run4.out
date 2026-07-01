@@ -1,0 +1,278 @@
+========================================================================
+SIMILARITY MATRIX  (all 6 tool pairs × active metrics)
+========================================================================
+Pair                                        Cosine      TF-IDF      BERTScore   WMD         SBERT     
+------------------------------------------------------------------------
+search_products  ↔  check_stock             0.4292      0.4292      0.9199      0.6220      0.5292    
+search_products  ↔  list_category_products  0.3223      0.3223      0.9131      0.5929      0.5711    
+search_products  ↔  track_order             0.1336      0.1336      0.8957      0.5385      0.2440    
+search_products  ↔  recommend_products      0.5832      0.5832      0.9423      0.6954      0.7448    
+check_stock  ↔  list_category_products      0.2075      0.2075      0.9013      0.5789      0.4250    
+check_stock  ↔  track_order                 0.0574      0.0574      0.8876      0.5550      0.3566    
+check_stock  ↔  recommend_products          0.4506      0.4506      0.9129      0.6601      0.4347    
+list_category_products  ↔  track_order      0.0754      0.0754      0.8850      0.5540      0.1658    
+list_category_products  ↔  recommend_products  0.3290      0.3290      0.9083      0.6039      0.4827    
+track_order  ↔  recommend_products          0.1637      0.1637      0.8894      0.5635      0.2350    
+
+========================================================================
+[2/3]  Running experiments  (15 prompts × 4 runs = 60 total)
+========================================================================
+
+P01 [search_products]  'I want to buy a wireless mouse — what do you have?'
+    run 1/4  +  called 'search_products'             (14.5s)
+    run 2/4  +  called 'search_products'             (7.9s)
+    run 3/4  +  called 'search_products'             (5.3s)
+    run 4/4  +  called 'search_products'             (4.8s)
+
+P02 [search_products]  'Do you sell noise-cancelling headphones? Show me what t...'
+    run 1/4  +  called 'search_products'             (9.3s)
+    run 2/4  +  called 'search_products'             (5.3s)
+    run 3/4  +  called 'search_products'             (4.9s)
+    run 4/4  +  called 'search_products'             (7.6s)
+
+P03 [search_products]  'I need a mechanical keyboard. What options exist in the...'
+    run 1/4  +  called 'search_products'             (9.2s)
+    run 2/4  +  called 'search_products'             (7.0s)
+    run 3/4  +  called 'search_products'             (6.5s)
+    run 4/4  +  called 'search_products'             (8.1s)
+
+P04 [check_stock]  'Is the Logitech MX Master 3S in stock right now?'
+    run 1/4  +  called 'check_stock'                 (5.9s)
+    run 2/4  +  called 'check_stock'                 (4.6s)
+    run 3/4  +  called 'check_stock'                 (4.5s)
+    run 4/4  +  called 'check_stock'                 (3.7s)
+
+P05 [check_stock]  'Do you currently have the Sony WH-1000XM5 available?'
+    run 1/4  +  called 'check_stock'                 (5.7s)
+    run 2/4  +  called 'check_stock'                 (4.5s)
+    run 3/4  +  called 'check_stock'                 (4.1s)
+    run 4/4  +  called 'check_stock'                 (3.9s)
+
+P06 [check_stock]  'Can I get a Keychron K2 today, or is it sold out?'
+    run 1/4  +  called 'check_stock'                 (5.8s)
+    run 2/4  +  called 'check_stock'                 (3.5s)
+    run 3/4  +  called 'check_stock'                 (2.8s)
+    run 4/4  +  called 'check_stock'                 (4.5s)
+
+P07 [list_category_products]  "What's in your laptop section?"
+    run 1/4  +  called 'list_category_products'      (6.8s)
+    run 2/4  +  called 'list_category_products'      (5.9s)
+    run 3/4  +  called 'list_category_products'      (9.5s)
+    run 4/4  +  called 'list_category_products'      (5.6s)
+
+P08 [list_category_products]  'Show me everything you carry under home office furnitur...'
+    run 1/4  +  called 'list_category_products'      (10.0s)
+    run 2/4  +  called 'list_category_products'      (8.3s)
+    run 3/4  +  called 'list_category_products'      (7.7s)
+    run 4/4  +  called 'list_category_products'      (8.3s)
+
+P09 [list_category_products]  'List what you have in the audio accessories category.'
+    run 1/4  +  called 'list_category_products'      (7.3s)
+    run 2/4  +  called 'list_category_products'      (6.1s)
+    run 3/4  +  called 'list_category_products'      (4.8s)
+    run 4/4  +  called 'list_category_products'      (4.1s)
+
+P10 [track_order]  'Order ORD-5522 — where is it right now?'
+    run 1/4  +  called 'track_order'                 (5.0s)
+    run 2/4  +  called 'track_order'                 (3.7s)
+    run 3/4  +  called 'track_order'                 (5.1s)
+    run 4/4  +  called 'track_order'                 (3.1s)
+
+P11 [track_order]  "My package from order ORD-1001 hasn't arrived. What's t..."
+    run 1/4  +  called 'track_order'                 (7.4s)
+    run 2/4  +  called 'track_order'                 (5.1s)
+    run 3/4  +  called 'track_order'                 (5.4s)
+    run 4/4  +  called 'track_order'                 (4.9s)
+
+P12 [track_order]  'When will order ORD-7733 be delivered?'
+    run 1/4  +  called 'track_order'                 (4.8s)
+    run 2/4  +  called 'track_order'                 (4.1s)
+    run 3/4  +  called 'track_order'                 (3.4s)
+    run 4/4  +  called 'track_order'                 (3.1s)
+
+P13 [recommend_products]  "What's the best wireless mouse you'd recommend?"
+    run 1/4  +  called 'recommend_products'          (6.6s)
+    run 2/4  +  called 'recommend_products'          (7.1s)
+    run 3/4  +  called 'recommend_products'          (3.3s)
+    run 4/4  +  called 'recommend_products'          (3.6s)
+
+P14 [recommend_products]  'Which noise-cancelling headphones would you suggest for...'
+    run 1/4  +  called 'recommend_products'          (6.2s)
+    run 2/4  +  called 'recommend_products'          (5.1s)
+    run 3/4  +  called 'recommend_products'          (4.4s)
+    run 4/4  +  called 'recommend_products'          (4.7s)
+
+P15 [recommend_products]  'Can you recommend a good budget mechanical keyboard for...'
+    run 1/4  +  called 'recommend_products'          (5.4s)
+    run 2/4  +  called 'recommend_products'          (3.8s)
+    run 3/4  +  called 'recommend_products'          (5.1s)
+    run 4/4  +  called 'recommend_products'          (3.7s)
+
+========================================================================
+[3/3]  RESULTS SUMMARY
+========================================================================
+
+Per-tool accuracy:
+  search_products         12/12  [############]  100%
+  check_stock             12/12  [############]  100%
+  list_category_products  12/12  [############]  100%
+  track_order             12/12  [############]  100%
+  recommend_products      12/12  [############]  100%
+
+  TOTAL                   60/60  [############]  100%
+
+------------------------------------------------------------------------
+Confusion rate per tool pair vs similarity scores:
+------------------------------------------------------------------------
+Pair                                        Confusion  Cosine      TF-IDF      BERTScore   WMD         SBERT     
+------------------------------------------------------------------------
+search_products  ↔  check_stock                 0.0%  0.4292      0.4292      0.9199      0.6220      0.5292    
+search_products  ↔  list_category_products      0.0%  0.3223      0.3223      0.9131      0.5929      0.5711    
+search_products  ↔  track_order                 0.0%  0.1336      0.1336      0.8957      0.5385      0.2440    
+search_products  ↔  recommend_products          0.0%  0.5832      0.5832      0.9423      0.6954      0.7448    
+check_stock  ↔  list_category_products          0.0%  0.2075      0.2075      0.9013      0.5789      0.4250    
+check_stock  ↔  track_order                     0.0%  0.0574      0.0574      0.8876      0.5550      0.3566    
+check_stock  ↔  recommend_products              0.0%  0.4506      0.4506      0.9129      0.6601      0.4347    
+list_category_products  ↔  track_order          0.0%  0.0754      0.0754      0.8850      0.5540      0.1658    
+list_category_products  ↔  recommend_products      0.0%  0.3290      0.3290      0.9083      0.6039      0.4827    
+track_order  ↔  recommend_products              0.0%  0.1637      0.1637      0.8894      0.5635      0.2350    
+
+========================================================================
+THRESHOLD ANALYSIS — at what similarity does confusion drop to zero?
+========================================================================
+(sorted by similarity score per metric; confusion% beside each pair)
+
+  Metric: Cosine
+    0.5832  search_products ↔ recommend_products          confusion=0%
+    0.4506  check_stock ↔ recommend_products          confusion=0%
+    0.4292  search_products ↔ check_stock                 confusion=0%
+    0.3290  list_category_products ↔ recommend_products          confusion=0%
+    0.3223  search_products ↔ list_category_products      confusion=0%
+    0.2075  check_stock ↔ list_category_products      confusion=0%
+    0.1637  track_order ↔ recommend_products          confusion=0%
+    0.1336  search_products ↔ track_order                 confusion=0%
+    0.0754  list_category_products ↔ track_order                 confusion=0%
+    0.0574  check_stock ↔ track_order                 confusion=0%
+    => no confusion observed at any similarity level
+
+  Metric: TF-IDF
+    0.5832  search_products ↔ recommend_products          confusion=0%
+    0.4506  check_stock ↔ recommend_products          confusion=0%
+    0.4292  search_products ↔ check_stock                 confusion=0%
+    0.3290  list_category_products ↔ recommend_products          confusion=0%
+    0.3223  search_products ↔ list_category_products      confusion=0%
+    0.2075  check_stock ↔ list_category_products      confusion=0%
+    0.1637  track_order ↔ recommend_products          confusion=0%
+    0.1336  search_products ↔ track_order                 confusion=0%
+    0.0754  list_category_products ↔ track_order                 confusion=0%
+    0.0574  check_stock ↔ track_order                 confusion=0%
+    => no confusion observed at any similarity level
+
+  Metric: BERTScore
+    0.9423  search_products ↔ recommend_products          confusion=0%
+    0.9199  search_products ↔ check_stock                 confusion=0%
+    0.9131  search_products ↔ list_category_products      confusion=0%
+    0.9129  check_stock ↔ recommend_products          confusion=0%
+    0.9083  list_category_products ↔ recommend_products          confusion=0%
+    0.9013  check_stock ↔ list_category_products      confusion=0%
+    0.8957  search_products ↔ track_order                 confusion=0%
+    0.8894  track_order ↔ recommend_products          confusion=0%
+    0.8876  check_stock ↔ track_order                 confusion=0%
+    0.8850  list_category_products ↔ track_order                 confusion=0%
+    => no confusion observed at any similarity level
+
+  Metric: WMD
+    0.6954  search_products ↔ recommend_products          confusion=0%
+    0.6601  check_stock ↔ recommend_products          confusion=0%
+    0.6220  search_products ↔ check_stock                 confusion=0%
+    0.6039  list_category_products ↔ recommend_products          confusion=0%
+    0.5929  search_products ↔ list_category_products      confusion=0%
+    0.5789  check_stock ↔ list_category_products      confusion=0%
+    0.5635  track_order ↔ recommend_products          confusion=0%
+    0.5550  check_stock ↔ track_order                 confusion=0%
+    0.5540  list_category_products ↔ track_order                 confusion=0%
+    0.5385  search_products ↔ track_order                 confusion=0%
+    => no confusion observed at any similarity level
+
+  Metric: SBERT
+    0.7448  search_products ↔ recommend_products          confusion=0%
+    0.5711  search_products ↔ list_category_products      confusion=0%
+    0.5292  search_products ↔ check_stock                 confusion=0%
+    0.4827  list_category_products ↔ recommend_products          confusion=0%
+    0.4347  check_stock ↔ recommend_products          confusion=0%
+    0.4250  check_stock ↔ list_category_products      confusion=0%
+    0.3566  check_stock ↔ track_order                 confusion=0%
+    0.2440  search_products ↔ track_order                 confusion=0%
+    0.2350  track_order ↔ recommend_products          confusion=0%
+    0.1658  list_category_products ↔ track_order                 confusion=0%
+    => no confusion observed at any similarity level
+
+------------------------------------------------------------------------
+RAW RUN LOG
+------------------------------------------------------------------------
+#     prompt  run  ground_truth            called                  ok    reason
+------------------------------------------------------------------------
+1     P1    R1   search_products         search_products         +     ok
+2     P1    R2   search_products         search_products         +     ok
+3     P1    R3   search_products         search_products         +     ok
+4     P1    R4   search_products         search_products         +     ok
+5     P2    R1   search_products         search_products         +     ok
+6     P2    R2   search_products         search_products         +     ok
+7     P2    R3   search_products         search_products         +     ok
+8     P2    R4   search_products         search_products         +     ok
+9     P3    R1   search_products         search_products         +     ok
+10    P3    R2   search_products         search_products         +     ok
+11    P3    R3   search_products         search_products         +     ok
+12    P3    R4   search_products         search_products         +     ok
+13    P4    R1   check_stock             check_stock             +     ok
+14    P4    R2   check_stock             check_stock             +     ok
+15    P4    R3   check_stock             check_stock             +     ok
+16    P4    R4   check_stock             check_stock             +     ok
+17    P5    R1   check_stock             check_stock             +     ok
+18    P5    R2   check_stock             check_stock             +     ok
+19    P5    R3   check_stock             check_stock             +     ok
+20    P5    R4   check_stock             check_stock             +     ok
+21    P6    R1   check_stock             check_stock             +     ok
+22    P6    R2   check_stock             check_stock             +     ok
+23    P6    R3   check_stock             check_stock             +     ok
+24    P6    R4   check_stock             check_stock             +     ok
+25    P7    R1   list_category_products  list_category_products  +     ok
+26    P7    R2   list_category_products  list_category_products  +     ok
+27    P7    R3   list_category_products  list_category_products  +     ok
+28    P7    R4   list_category_products  list_category_products  +     ok
+29    P8    R1   list_category_products  list_category_products  +     ok
+30    P8    R2   list_category_products  list_category_products  +     ok
+31    P8    R3   list_category_products  list_category_products  +     ok
+32    P8    R4   list_category_products  list_category_products  +     ok
+33    P9    R1   list_category_products  list_category_products  +     ok
+34    P9    R2   list_category_products  list_category_products  +     ok
+35    P9    R3   list_category_products  list_category_products  +     ok
+36    P9    R4   list_category_products  list_category_products  +     ok
+37    P10   R1   track_order             track_order             +     ok
+38    P10   R2   track_order             track_order             +     ok
+39    P10   R3   track_order             track_order             +     ok
+40    P10   R4   track_order             track_order             +     ok
+41    P11   R1   track_order             track_order             +     ok
+42    P11   R2   track_order             track_order             +     ok
+43    P11   R3   track_order             track_order             +     ok
+44    P11   R4   track_order             track_order             +     ok
+45    P12   R1   track_order             track_order             +     ok
+46    P12   R2   track_order             track_order             +     ok
+47    P12   R3   track_order             track_order             +     ok
+48    P12   R4   track_order             track_order             +     ok
+49    P13   R1   recommend_products      recommend_products      +     ok
+50    P13   R2   recommend_products      recommend_products      +     ok
+51    P13   R3   recommend_products      recommend_products      +     ok
+52    P13   R4   recommend_products      recommend_products      +     ok
+53    P14   R1   recommend_products      recommend_products      +     ok
+54    P14   R2   recommend_products      recommend_products      +     ok
+55    P14   R3   recommend_products      recommend_products      +     ok
+56    P14   R4   recommend_products      recommend_products      +     ok
+57    P15   R1   recommend_products      recommend_products      +     ok
+58    P15   R2   recommend_products      recommend_products      +     ok
+59    P15   R3   recommend_products      recommend_products      +     ok
+60    P15   R4   recommend_products      recommend_products      +     ok
+
+========================================================================
+Experiment complete.
+========================================================================

@@ -1,0 +1,320 @@
+(langgraph) F:\langgraph>python tool-name-similarity\tool_confusion_experiment.py
+========================================================================
+tool_confusion_experiment  |  model=llama3.1:8b  runs/prompt=4
+========================================================================
+
+[1/3]  Computing similarity metrics...
+  BoW-Cos (bag-of-words cosine)... done
+Loading weights: 100%|███████████████████████████████████████████████████████████████████████████| 389/389 [00:00<00:00, 3109.80it/s]
+[transformers] RobertaModel LOAD REPORT from: roberta-large
+Key                       | Status     | 
+--------------------------+------------+-
+lm_head.bias              | UNEXPECTED | 
+lm_head.layer_norm.bias   | UNEXPECTED | 
+lm_head.dense.weight      | UNEXPECTED | 
+lm_head.dense.bias        | UNEXPECTED | 
+lm_head.layer_norm.weight | UNEXPECTED | 
+pooler.dense.weight       | MISSING    | 
+pooler.dense.bias         | MISSING    | 
+
+Notes:
+- UNEXPECTED:   can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+- MISSING:      those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+done
+  Word Mover's Distance...
+  Loading GloVe-100 vectors (first run ~128 MB)...
+Loading weights: 100%|███████████████████████████████████████████████████████████████████████████| 103/103 [00:00<00:00, 3043.72it/s]
+done
+  Llama 3.1 contextual (transformers)...
+  Model: meta-llama/Meta-Llama-3.1-8B (full model — ~16 GB first run)
+Fetching 4 files: 100%|████████████████████████████████████████████████████████████████████████████| 4/4 [3:07:35<00:00, 2813.76s/it]
+Download complete: 100%|███████████████████████████████████████████████████████████████████████| 11.1G/11.1G [3:07:36<00:00, 985kB/s]
+Loading weights: 100%|████████████████████████████████████████████████████████████████████████████| 290/290 [00:00<00:00, 859.02it/s]
+[transformers] LlamaModel LOAD REPORT from: meta-llama/Meta-Llama-3.1-8B
+Key            | Status     |  | 
+---------------+------------+--+-
+lm_head.weight | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:   can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+  Llama-Ctx done
+
+========================================================================
+SIMILARITY MATRIX  (all 10 tool pairs × active metrics)
+========================================================================
+Pair                                        BoW-Cos     BERTScore   WMD         SBERT       Llama-Ctx 
+------------------------------------------------------------------------
+search_products  ↔  check_stock             0.8183      0.9665      0.7924      0.6160      0.8933    
+search_products  ↔  list_category_products  0.8986      0.9679      0.8517      0.7756      0.8992    
+search_products  ↔  track_order             0.2535      0.8872      0.5602      0.2845      0.7276    
+search_products  ↔  recommend_products      0.9276      0.9766      0.8822      0.7758      0.8937    
+check_stock  ↔  list_category_products      0.8035      0.9535      0.7524      0.5009      0.8193    
+check_stock  ↔  track_order                 0.2343      0.8793      0.5587      0.3813      0.7514    
+check_stock  ↔  recommend_products          0.8303      0.9623      0.7824      0.5018      0.8223    
+list_category_products  ↔  track_order      0.2572      0.8850      0.5585      0.2604      0.6722    
+list_category_products  ↔  recommend_products  0.9118      0.9725      0.8406      0.6800      0.8390    
+track_order  ↔  recommend_products          0.2572      0.8850      0.5561      0.2826      0.6711    
+
+========================================================================
+[2/3]  Running experiments  (15 prompts × 4 runs = 60 total)
+========================================================================
+
+P01 [search_products]  'I want to buy a wireless mouse — what do you have?'
+    run 1/4  x  graph error: timed out waiting for llama-server to start -  (status code: 500)  (464.3s)
+    run 2/4  +  called 'search_products'             (186.1s)
+    run 3/4  +  called 'search_products'             (4.6s)
+    run 4/4  +  called 'search_products'             (6.8s)
+
+P02 [search_products]  'Do you sell noise-cancelling headphones? Show me what t...'
+    run 1/4  +  called 'search_products'             (8.6s)
+    run 2/4  +  called 'search_products'             (5.3s)
+    run 3/4  +  called 'search_products'             (6.9s)
+    run 4/4  x  called 'list_category_products'      (6.8s)
+
+P03 [search_products]  'I need a mechanical keyboard. What options exist in the...'
+    run 1/4  x  called 'list_category_products'      (8.6s)
+    run 2/4  +  called 'search_products'             (6.2s)
+    run 3/4  +  called 'search_products'             (5.3s)
+    run 4/4  x  called 'list_category_products'      (8.9s)
+
+P04 [check_stock]  'Is the Logitech MX Master 3S in stock right now?'
+    run 1/4  +  called 'check_stock'                 (4.8s)
+    run 2/4  +  called 'check_stock'                 (3.0s)
+    run 3/4  +  called 'check_stock'                 (3.0s)
+    run 4/4  +  called 'check_stock'                 (3.7s)
+
+P05 [check_stock]  'Do you currently have the Sony WH-1000XM5 available?'
+    run 1/4  +  called 'check_stock'                 (4.8s)
+    run 2/4  +  called 'check_stock'                 (3.2s)
+    run 3/4  +  called 'check_stock'                 (4.0s)
+    run 4/4  +  called 'check_stock'                 (3.2s)
+
+P06 [check_stock]  'Can I get a Keychron K2 today, or is it sold out?'
+    run 1/4  +  called 'check_stock'                 (4.6s)
+    run 2/4  +  called 'check_stock'                 (3.6s)
+    run 3/4  +  called 'check_stock'                 (5.0s)
+    run 4/4  +  called 'check_stock'                 (3.1s)
+
+P07 [list_category_products]  "What's in your laptop section?"
+    run 1/4  +  called 'list_category_products'      (6.0s)
+    run 2/4  +  called 'list_category_products'      (5.6s)
+    run 3/4  +  called 'list_category_products'      (5.0s)
+    run 4/4  +  called 'list_category_products'      (6.5s)
+
+P08 [list_category_products]  'Show me everything you carry under home office furnitur...'
+    run 1/4  +  called 'list_category_products'      (6.5s)
+    run 2/4  +  called 'list_category_products'      (5.8s)
+    run 3/4  +  called 'list_category_products'      (6.3s)
+    run 4/4  +  called 'list_category_products'      (4.3s)
+
+P09 [list_category_products]  'List what you have in the audio accessories category.'
+    run 1/4  +  called 'list_category_products'      (6.5s)
+    run 2/4  +  called 'list_category_products'      (4.3s)
+    run 3/4  +  called 'list_category_products'      (5.2s)
+    run 4/4  +  called 'list_category_products'      (4.7s)
+
+P10 [track_order]  'Order ORD-5522 — where is it right now?'
+    run 1/4  +  called 'track_order'                 (5.1s)
+    run 2/4  +  called 'track_order'                 (4.8s)
+    run 3/4  +  called 'track_order'                 (3.3s)
+    run 4/4  +  called 'track_order'                 (3.4s)
+
+P11 [track_order]  "My package from order ORD-1001 hasn't arrived. What's t..."
+    run 1/4  +  called 'track_order'                 (6.3s)
+    run 2/4  +  called 'track_order'                 (5.0s)
+    run 3/4  +  called 'track_order'                 (5.2s)
+    run 4/4  +  called 'track_order'                 (5.4s)
+
+P12 [track_order]  'When will order ORD-7733 be delivered?'
+    run 1/4  +  called 'track_order'                 (4.7s)
+    run 2/4  +  called 'track_order'                 (3.2s)
+    run 3/4  +  called 'track_order'                 (3.5s)
+    run 4/4  +  called 'track_order'                 (3.2s)
+
+P13 [recommend_products]  "What's the best wireless mouse you'd recommend?"
+    run 1/4  +  called 'recommend_products'          (5.0s)
+    run 2/4  +  called 'recommend_products'          (4.1s)
+    run 3/4  +  called 'recommend_products'          (7.7s)
+    run 4/4  +  called 'recommend_products'          (8.9s)
+
+P14 [recommend_products]  'Which noise-cancelling headphones would you suggest for...'
+    run 1/4  +  called 'recommend_products'          (7.8s)
+    run 2/4  +  called 'recommend_products'          (5.8s)
+    run 3/4  +  called 'recommend_products'          (6.5s)
+    run 4/4  +  called 'recommend_products'          (4.5s)
+
+P15 [recommend_products]  'Can you recommend a good budget mechanical keyboard for...'
+    run 1/4  +  called 'recommend_products'          (7.4s)
+    run 2/4  +  called 'recommend_products'          (5.3s)
+    run 3/4  +  called 'recommend_products'          (4.8s)
+    run 4/4  +  called 'recommend_products'          (3.7s)
+
+========================================================================
+[3/3]  RESULTS SUMMARY
+========================================================================
+
+Per-tool accuracy:
+  search_products          8/12  [########....]   66%  confused with: list_category_products×3
+  check_stock             12/12  [############]  100%
+  list_category_products  12/12  [############]  100%
+  track_order             12/12  [############]  100%
+  recommend_products      12/12  [############]  100%
+
+  TOTAL                   56/60  [###########.]   93%
+
+------------------------------------------------------------------------
+Confusion rate per tool pair vs similarity scores:
+------------------------------------------------------------------------
+Pair                                        Confusion  BoW-Cos     BERTScore   WMD         SBERT       Llama-Ctx 
+------------------------------------------------------------------------
+search_products  ↔  check_stock                 0.0%  0.8183      0.9665      0.7924      0.6160      0.8933    
+search_products  ↔  list_category_products     12.5%  0.8986      0.9679      0.8517      0.7756      0.8992    
+search_products  ↔  track_order                 0.0%  0.2535      0.8872      0.5602      0.2845      0.7276    
+search_products  ↔  recommend_products          0.0%  0.9276      0.9766      0.8822      0.7758      0.8937    
+check_stock  ↔  list_category_products          0.0%  0.8035      0.9535      0.7524      0.5009      0.8193    
+check_stock  ↔  track_order                     0.0%  0.2343      0.8793      0.5587      0.3813      0.7514    
+check_stock  ↔  recommend_products              0.0%  0.8303      0.9623      0.7824      0.5018      0.8223    
+list_category_products  ↔  track_order          0.0%  0.2572      0.8850      0.5585      0.2604      0.6722    
+list_category_products  ↔  recommend_products      0.0%  0.9118      0.9725      0.8406      0.6800      0.8390    
+track_order  ↔  recommend_products              0.0%  0.2572      0.8850      0.5561      0.2826      0.6711    
+
+========================================================================
+THRESHOLD ANALYSIS — at what similarity does confusion drop to zero?
+========================================================================
+(sorted by similarity score per metric; confusion% beside each pair)
+
+  Metric: BoW-Cos
+    0.9276  search_products ↔ recommend_products          confusion=0%
+    0.9118  list_category_products ↔ recommend_products          confusion=0%
+    0.8986  search_products ↔ list_category_products      confusion=12% <-- confused
+    0.8303  check_stock ↔ recommend_products          confusion=0%
+    0.8183  search_products ↔ check_stock                 confusion=0%
+    0.8035  check_stock ↔ list_category_products      confusion=0%
+    0.2572  list_category_products ↔ track_order                 confusion=0%
+    0.2572  track_order ↔ recommend_products          confusion=0%
+    0.2535  search_products ↔ track_order                 confusion=0%
+    0.2343  check_stock ↔ track_order                 confusion=0%
+    => confusion present up to sim=0.8986
+
+  Metric: BERTScore
+    0.9766  search_products ↔ recommend_products          confusion=0%
+    0.9725  list_category_products ↔ recommend_products          confusion=0%
+    0.9679  search_products ↔ list_category_products      confusion=12% <-- confused
+    0.9665  search_products ↔ check_stock                 confusion=0%
+    0.9623  check_stock ↔ recommend_products          confusion=0%
+    0.9535  check_stock ↔ list_category_products      confusion=0%
+    0.8872  search_products ↔ track_order                 confusion=0%
+    0.8850  list_category_products ↔ track_order                 confusion=0%
+    0.8850  track_order ↔ recommend_products          confusion=0%
+    0.8793  check_stock ↔ track_order                 confusion=0%
+    => confusion present up to sim=0.9679
+
+  Metric: WMD
+    0.8822  search_products ↔ recommend_products          confusion=0%
+    0.8517  search_products ↔ list_category_products      confusion=12% <-- confused
+    0.8406  list_category_products ↔ recommend_products          confusion=0%
+    0.7924  search_products ↔ check_stock                 confusion=0%
+    0.7824  check_stock ↔ recommend_products          confusion=0%
+    0.7524  check_stock ↔ list_category_products      confusion=0%
+    0.5602  search_products ↔ track_order                 confusion=0%
+    0.5587  check_stock ↔ track_order                 confusion=0%
+    0.5585  list_category_products ↔ track_order                 confusion=0%
+    0.5561  track_order ↔ recommend_products          confusion=0%
+    => confusion present up to sim=0.8517
+
+  Metric: SBERT
+    0.7758  search_products ↔ recommend_products          confusion=0%
+    0.7756  search_products ↔ list_category_products      confusion=12% <-- confused
+    0.6800  list_category_products ↔ recommend_products          confusion=0%
+    0.6160  search_products ↔ check_stock                 confusion=0%
+    0.5018  check_stock ↔ recommend_products          confusion=0%
+    0.5009  check_stock ↔ list_category_products      confusion=0%
+    0.3813  check_stock ↔ track_order                 confusion=0%
+    0.2845  search_products ↔ track_order                 confusion=0%
+    0.2826  track_order ↔ recommend_products          confusion=0%
+    0.2604  list_category_products ↔ track_order                 confusion=0%
+    => confusion present up to sim=0.7756
+
+  Metric: Llama-Ctx
+    0.8992  search_products ↔ list_category_products      confusion=12% <-- confused
+    0.8937  search_products ↔ recommend_products          confusion=0%
+    0.8933  search_products ↔ check_stock                 confusion=0%
+    0.8390  list_category_products ↔ recommend_products          confusion=0%
+    0.8223  check_stock ↔ recommend_products          confusion=0%
+    0.8193  check_stock ↔ list_category_products      confusion=0%
+    0.7514  check_stock ↔ track_order                 confusion=0%
+    0.7276  search_products ↔ track_order                 confusion=0%
+    0.6722  list_category_products ↔ track_order                 confusion=0%
+    0.6711  track_order ↔ recommend_products          confusion=0%
+    => confusion present up to sim=0.8992
+    => safe below sim=0.8937  (ambiguity zone: 0.8937–0.8992)
+
+------------------------------------------------------------------------
+RAW RUN LOG
+------------------------------------------------------------------------
+#     prompt  run  ground_truth            called                  ok    reason
+------------------------------------------------------------------------
+1     P1    R1   search_products         (none)                  x     graph error: timed out waiting for llama-server to start -  (status code: 500)
+2     P1    R2   search_products         search_products         +     ok
+3     P1    R3   search_products         search_products         +     ok
+4     P1    R4   search_products         search_products         +     ok
+5     P2    R1   search_products         search_products         +     ok
+6     P2    R2   search_products         search_products         +     ok
+7     P2    R3   search_products         search_products         +     ok
+8     P2    R4   search_products         list_category_products  x     called 'list_category_products'
+9     P3    R1   search_products         list_category_products  x     called 'list_category_products'
+10    P3    R2   search_products         search_products         +     ok
+11    P3    R3   search_products         search_products         +     ok
+12    P3    R4   search_products         list_category_products  x     called 'list_category_products'
+13    P4    R1   check_stock             check_stock             +     ok
+14    P4    R2   check_stock             check_stock             +     ok
+15    P4    R3   check_stock             check_stock             +     ok
+16    P4    R4   check_stock             check_stock             +     ok
+17    P5    R1   check_stock             check_stock             +     ok
+18    P5    R2   check_stock             check_stock             +     ok
+19    P5    R3   check_stock             check_stock             +     ok
+20    P5    R4   check_stock             check_stock             +     ok
+21    P6    R1   check_stock             check_stock             +     ok
+22    P6    R2   check_stock             check_stock             +     ok
+23    P6    R3   check_stock             check_stock             +     ok
+24    P6    R4   check_stock             check_stock             +     ok
+25    P7    R1   list_category_products  list_category_products  +     ok
+26    P7    R2   list_category_products  list_category_products  +     ok
+27    P7    R3   list_category_products  list_category_products  +     ok
+28    P7    R4   list_category_products  list_category_products  +     ok
+29    P8    R1   list_category_products  list_category_products  +     ok
+30    P8    R2   list_category_products  list_category_products  +     ok
+31    P8    R3   list_category_products  list_category_products  +     ok
+32    P8    R4   list_category_products  list_category_products  +     ok
+33    P9    R1   list_category_products  list_category_products  +     ok
+34    P9    R2   list_category_products  list_category_products  +     ok
+35    P9    R3   list_category_products  list_category_products  +     ok
+36    P9    R4   list_category_products  list_category_products  +     ok
+37    P10   R1   track_order             track_order             +     ok
+38    P10   R2   track_order             track_order             +     ok
+39    P10   R3   track_order             track_order             +     ok
+40    P10   R4   track_order             track_order             +     ok
+41    P11   R1   track_order             track_order             +     ok
+42    P11   R2   track_order             track_order             +     ok
+43    P11   R3   track_order             track_order             +     ok
+44    P11   R4   track_order             track_order             +     ok
+45    P12   R1   track_order             track_order             +     ok
+46    P12   R2   track_order             track_order             +     ok
+47    P12   R3   track_order             track_order             +     ok
+48    P12   R4   track_order             track_order             +     ok
+49    P13   R1   recommend_products      recommend_products      +     ok
+50    P13   R2   recommend_products      recommend_products      +     ok
+51    P13   R3   recommend_products      recommend_products      +     ok
+52    P13   R4   recommend_products      recommend_products      +     ok
+53    P14   R1   recommend_products      recommend_products      +     ok
+54    P14   R2   recommend_products      recommend_products      +     ok
+55    P14   R3   recommend_products      recommend_products      +     ok
+56    P14   R4   recommend_products      recommend_products      +     ok
+57    P15   R1   recommend_products      recommend_products      +     ok
+58    P15   R2   recommend_products      recommend_products      +     ok
+59    P15   R3   recommend_products      recommend_products      +     ok
+60    P15   R4   recommend_products      recommend_products      +     ok
+
+========================================================================
+Experiment complete.
+========================================================================
