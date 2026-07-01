@@ -53,9 +53,15 @@ LEXICAL (surface word overlap), STATIC embeddings, and CONTEXTUAL embeddings:
   5. Llama-Ctx  (transformers, full Llama 3.1 8B, ~16 GB 1st run)      contextual (Llama itself)
 
 Llama-Ctx is the faithful match to the routing model's internal similarity:
-the same network embeds the tool-description text via all 32 layers, mean-pooled.
-It is the contextual counterpart to the raw embed_tokens lookup in
+the same network embeds the tool's JSON schema text via all 32 layers, mean-
+pooled. It is the contextual counterpart to the raw embed_tokens lookup in
 tool_name_embeddings.py (which reads layer-0 vectors only, no transformer applied).
+
+All 5 metrics embed the FULL OpenAI-format tool schema (name + description +
+parameters, via convert_to_openai_tool — the same helper middleware_deep_dive.py
+uses to show the real provider payload), not just "name: docstring". Argument
+names/types are part of what the model reads, so they're part of what can
+cause — or prevent — confusion.
 
 Headline output: for each metric, the similarity threshold below which
 confusion dropped to zero — the "safe separation" for tool naming.
@@ -83,6 +89,7 @@ from typing import Annotated
 
 import numpy as np
 from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.utils.function_calling import convert_to_openai_tool
 from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
@@ -344,8 +351,15 @@ def run_once(graph, system_msg: dict, prompt: str, ground_truth: str,
 # ---------------------------------------------------------------------------
 # Similarity metrics
 # ---------------------------------------------------------------------------
-TOOL_TEXTS = {t.__name__: f"{t.__name__}: {t.__doc__}" for t in TOOLS}
-TOOL_PAIRS  = list(combinations(TOOL_NAMES, 2))   # 6 pairs
+# TOOL_TEXTS is the JSON schema LangGraph actually sends the model — name,
+# description, AND the argument schema (property names, types, required list)
+# via convert_to_openai_tool, the same helper middleware_deep_dive.py and
+# schema_stress_test.py use to inspect the real provider payload. Argument
+# names/types matter for confusion too: two tools with identical descriptions
+# but different parameter shapes are less likely to be swapped by the model,
+# and this makes that visible to every similarity metric below.
+TOOL_TEXTS = {t.__name__: json.dumps(convert_to_openai_tool(t)) for t in TOOLS}
+TOOL_PAIRS = list(combinations(TOOL_NAMES, 2))
 
 
 def cosine_similarities() -> dict[tuple, float]:
