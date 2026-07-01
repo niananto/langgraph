@@ -79,6 +79,9 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from typing_extensions import TypedDict
 
+from dotenv import load_dotenv
+load_dotenv()  # load .env for HF_TOKEN if present
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -231,7 +234,7 @@ class State(TypedDict):
 
 
 def build_graph() -> object:
-    llm = ChatOllama(model=MODEL, temperature=0.7).bind_tools(TOOLS)
+    llm = ChatOllama(model=MODEL, temperature=1).bind_tools(TOOLS)
 
     def call_model(state: State) -> State:
         return {"messages": [llm.invoke(state["messages"])]}
